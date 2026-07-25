@@ -8,6 +8,7 @@ export const GITHUB_SETUP_URL =
   "https://github.com/attmous/next-best-content#local-setup";
 
 export const LANDING_CTA_PRIMARY = "Try the interactive demo";
+export const LANDING_CTA_PITCH = "View the 6-slide pitch";
 export const LANDING_CTA_SECONDARY = "Run privately with your own key";
 
 export const LANDING_HEADLINE =

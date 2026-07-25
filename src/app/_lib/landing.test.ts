@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   GITHUB_SETUP_URL,
   LANDING_CTA_PRIMARY,
+  LANDING_CTA_PITCH,
   LANDING_CTA_SECONDARY,
   LANDING_HEADLINE,
   TRUST_POINTS,
@@ -11,6 +12,7 @@ import {
 describe("landing content", () => {
   it("leads with the interactive demo", () => {
     expect(LANDING_CTA_PRIMARY).toBe("Try the interactive demo");
+    expect(LANDING_CTA_PITCH).toBe("View the 6-slide pitch");
   });
 
   it("offers the private self-hosted path", () => {

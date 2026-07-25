@@ -11,6 +11,7 @@ import {
 } from "@/contracts";
 import {
   DEMO_ASSETS,
+  DEMO_FEATURED_SIGNAL_ID,
   DEMO_SIGNAL_IDS,
   DEMO_VIDEO_URL,
   buildDemoContentPack,
@@ -50,7 +51,28 @@ describe("demo analyze fixture", () => {
     );
     expect(titles[0]).toContain("shopping list");
     expect(titles[1]).toContain("watering");
-    expect(titles[2]).toContain("died");
+    expect(titles[2]).toBe(
+      "show the mistakes and fixes—not only the reveal.",
+    );
+  });
+
+  it("ships the exact destination-aware jury case study", () => {
+    const signalId = DEMO_FEATURED_SIGNAL_ID;
+    const short = buildDemoContentPack(signalId, "short");
+    const document = buildDemoContentPack(signalId, "carousel");
+
+    expect(short.title).toBe(
+      "3 mistakes that nearly killed my balcony garden.",
+    );
+    expect(document.title).toBe("6 decisions behind a 2m² food garden.");
+    expect(document.scenes.map((scene) => scene.headline)).toEqual([
+      "1 · Map the light first",
+      "2 · Choose containers before crops",
+      "3 · Start with fewer varieties",
+      "4 · Water by soil, not by clock",
+      "5 · Quarantine every new plant",
+      "6 · Keep the failure notes",
+    ]);
   });
 
   it("contains no reference to the previous demo creator", () => {
