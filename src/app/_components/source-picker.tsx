@@ -4,6 +4,11 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 
 import { parseYoutubeUrl } from "@/app/_lib/youtube";
 import {
+  allowsRequestScopedModelKey,
+  sourceOptionState,
+  type RuntimeContext,
+} from "@/app/_lib/capabilities";
+import {
   SOURCE_OPTIONS,
   type SourceOption,
   type SourceOptionId,
@@ -44,30 +49,49 @@ const URL_ERROR_COPY: Record<string, string> = {
  * and disabled state renders from the platform registry.
  */
 export function SourcePicker({
+  runtime,
   initialOpenId = null,
   onAnalyzeYoutube,
   onImport,
   onDemo,
 }: {
+  runtime: RuntimeContext;
   initialOpenId?: SourceOptionId | null;
-  onAnalyzeYoutube: (normalizedUrl: string) => void;
-  onImport: (submission: ImportSubmission) => void;
+  onAnalyzeYoutube: (normalizedUrl: string, modelApiKey?: string) => void;
+  onImport: (submission: ImportSubmission, modelApiKey?: string) => void;
   onDemo: () => void;
 }) {
+  const keyInputId = useId();
   const [openId, setOpenId] = useState<SourceOptionId | null>(initialOpenId);
   const [importPlatform, setImportPlatform] =
     useState<SourcePlatformTag>("youtube");
+  const [modelApiKey, setModelApiKey] = useState("");
+  const requestScopedKeyAllowed = allowsRequestScopedModelKey(runtime);
+  const importInteractive = sourceOptionState(
+    SOURCE_OPTIONS.find((option) => option.id === "import")!,
+    runtime,
+  ).interactive;
+
+  function requestScopedKey(): string | undefined {
+    if (!requestScopedKeyAllowed) return undefined;
+    const trimmed = modelApiKey.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  }
 
   function panelFor(option: SourceOption): ReactNode {
     switch (option.id) {
       case "youtube-live":
-        return <YoutubeUrlPanel onSubmit={onAnalyzeYoutube} />;
+        return (
+          <YoutubeUrlPanel
+            onSubmit={(url) => onAnalyzeYoutube(url, requestScopedKey())}
+          />
+        );
       case "import":
         return (
           <ImportForm
             key={importPlatform}
             initialPlatform={importPlatform}
-            onSubmit={onImport}
+            onSubmit={(submission) => onImport(submission, requestScopedKey())}
             submitting={false}
           />
         );
@@ -79,7 +103,7 @@ export function SourcePicker({
               is fictional and stays labeled as synthetic on every screen.
             </p>
             <div>
-              <Button onClick={onDemo}>Try Adam&rsquo;s channel demo</Button>
+              <Button onClick={onDemo}>Try the interactive demo</Button>
             </div>
           </div>
         );
@@ -89,17 +113,19 @@ export function SourcePicker({
             <p className="text-sm leading-6 text-ink-soft">
               {option.unavailableReason}
             </p>
-            <div>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  setImportPlatform("linkedin");
-                  setOpenId("import");
-                }}
-              >
-                Import LinkedIn comments instead
-              </Button>
-            </div>
+            {importInteractive && (
+              <div>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setImportPlatform("linkedin");
+                    setOpenId("import");
+                  }}
+                >
+                  Import LinkedIn comments instead
+                </Button>
+              </div>
+            )}
           </div>
         );
     }
@@ -110,11 +136,73 @@ export function SourcePicker({
       <h2 className="font-display text-xl font-bold text-ink">
         Where should we find the audience signal?
       </h2>
+      {requestScopedKeyAllowed && (
+        <div className="mt-4 rounded-2xl border border-line bg-surface px-5 py-4">
+          <label
+            htmlFor={keyInputId}
+            className="block text-sm font-semibold text-ink"
+          >
+            Request-scoped OpenAI API key{" "}
+            <span className="font-normal text-ink-faint">(optional)</span>
+          </label>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-ink-faint">
+            Used only for this run and sent to this self-hosted API. It is
+            never saved, cached, logged, returned, or placed in a URL. Leave
+            it blank to use a server-managed container key when configured.
+          </p>
+          <input
+            id={keyInputId}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={modelApiKey}
+            onChange={(event) => setModelApiKey(event.target.value)}
+            placeholder="sk-…"
+            className="mt-3 w-full rounded-xl border border-line-strong bg-surface-raised px-4 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint"
+          />
+        </div>
+      )}
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {SOURCE_OPTIONS.map((option) => {
+          const state = sourceOptionState(option, runtime);
           const isOpen = openId === option.id;
-          const isGated = option.availability === "gated";
+          const isGated = !state.interactive;
           const panelId = `source-panel-${option.id}`;
+
+          if (!state.interactive && option.id !== "linkedin-live") {
+            // Informational card: no panel, no forms, no calls possible.
+            return (
+              <div
+                key={option.id}
+                aria-disabled="true"
+                className="rounded-2xl border border-dashed border-line px-5 py-4"
+              >
+                <span className="flex min-w-0 items-start gap-3.5">
+                  <span
+                    aria-hidden="true"
+                    className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl bg-surface text-ink-faint"
+                  >
+                    <OptionGlyph option={option} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink-faint">
+                        {option.title}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full border border-line-strong px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                        <LockIcon className="size-3" />
+                        Not available here
+                      </span>
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-ink-faint">
+                      {state.reason}
+                    </span>
+                  </span>
+                </span>
+              </div>
+            );
+          }
+
           return (
             <div
               key={option.id}
@@ -194,10 +282,6 @@ function YoutubeUrlPanel({
   const [value, setValue] = useState("");
   const [inputError, setInputError] = useState<string | null>(null);
 
-  const gateNote = SOURCE_OPTIONS.find(
-    (option) => option.id === "youtube-live",
-  )?.unavailableReason;
-
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     const parsed = parseYoutubeUrl(value);
@@ -247,9 +331,10 @@ function YoutubeUrlPanel({
           {inputError}
         </p>
       )}
-      {gateNote && (
-        <p className="mt-3 text-xs leading-5 text-ink-faint">{gateNote}</p>
-      )}
+      <p className="mt-3 text-xs leading-5 text-ink-faint">
+        Live analysis is enabled for this installation. A failed request
+        surfaces its typed error — data is never silently substituted.
+      </p>
     </form>
   );
 }

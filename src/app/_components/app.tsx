@@ -15,6 +15,12 @@ import {
 } from "@/app/_lib/api-client";
 import { toUiError, type UiError } from "@/app/_lib/errors";
 import {
+  PUBLIC_RUNTIME,
+  fetchRuntimeContext,
+  outputGenerationState,
+  type RuntimeContext,
+} from "@/app/_lib/capabilities";
+import {
   getOutput,
   type OutputId,
   type SourceDescriptor,
@@ -29,6 +35,7 @@ import {
   type ImportSubmission,
 } from "@/app/_components/import-form";
 import { JourneyProgress, type JourneyStep } from "@/app/_components/journey";
+import { LandingScreen } from "@/app/_components/landing-screen";
 import { PreflightScreen } from "@/app/_components/preflight-screen";
 import { ProgressScreen } from "@/app/_components/progress-screen";
 import { SignalsScreen } from "@/app/_components/signals-screen";
@@ -38,6 +45,7 @@ import { Button, ProvenanceBadge, Wordmark } from "@/app/_components/ui";
 
 type Stage =
   | "start"
+  | "workspace"
   | "analyzing"
   | "analysis-error"
   | "signals"
@@ -46,7 +54,10 @@ type Stage =
   | "preflight"
   | "export";
 
-const STAGE_TO_JOURNEY: Record<Exclude<Stage, "start">, JourneyStep> = {
+const STAGE_TO_JOURNEY: Record<
+  Exclude<Stage, "start" | "workspace">,
+  JourneyStep
+> = {
   analyzing: "listen",
   "analysis-error": "listen",
   signals: "decide",
@@ -75,10 +86,13 @@ interface AnalysisRun {
   url: string;
   analyzeSource: AnalyzeSource;
   descriptor: SourceDescriptor;
+  /** Request-scoped only: held in memory for this run and never persisted. */
+  modelApiKey?: string;
 }
 
 export function App() {
   const [stage, setStage] = useState<Stage>("start");
+  const [runtime, setRuntime] = useState<RuntimeContext>(PUBLIC_RUNTIME);
   const [run, setRun] = useState<AnalysisRun | null>(null);
   const [startPanel, setStartPanel] = useState<SourceOptionId | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
@@ -98,6 +112,16 @@ export function App() {
   /** Increments on restart so stale async results never land. */
   const runRef = useRef(0);
   const isFirstRender = useRef(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchRuntimeContext().then((context) => {
+      if (!cancelled) setRuntime(context);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -126,6 +150,9 @@ export function App() {
       client.analyze({
         youtubeUrl: nextRun.url,
         source: nextRun.analyzeSource,
+        ...(nextRun.modelApiKey === undefined
+          ? {}
+          : { modelApiKey: nextRun.modelApiKey }),
       }),
       sleep(MIN_ANALYSIS_MS),
     ]);
@@ -141,16 +168,20 @@ export function App() {
     }
   }
 
-  function analyzeYoutube(url: string) {
+  function analyzeYoutube(url: string, modelApiKey?: string) {
     void startAnalyze({
       mode: "live",
       url,
       analyzeSource: { type: "youtube" },
       descriptor: { mode: "live", platform: "youtube", url },
+      ...(modelApiKey === undefined ? {} : { modelApiKey }),
     });
   }
 
-  function analyzeImport(submission: ImportSubmission) {
+  function analyzeImport(
+    submission: ImportSubmission,
+    modelApiKey?: string,
+  ) {
     void startAnalyze({
       mode: "live",
       url: submission.sourceUrl,
@@ -162,6 +193,7 @@ export function App() {
         fileName: submission.fileName,
         importedCommentCount: submission.comments.length,
       },
+      ...(modelApiKey === undefined ? {} : { modelApiKey }),
     });
   }
 
@@ -190,7 +222,13 @@ export function App() {
     if (!analysis || !run) return;
     const signal = analysis.signals.find((item) => item.id === id);
     const format = getOutput(output).contractFormat;
-    if (!signal || !format) return;
+    if (
+      !signal ||
+      !format ||
+      !outputGenerationState(output, run.mode, runtime).interactive
+    ) {
+      return;
+    }
 
     const runId = runRef.current;
     setGenerating(true);
@@ -201,6 +239,9 @@ export function App() {
         signal,
         format,
         provenance: analysis.provenance,
+        ...(run.modelApiKey === undefined
+          ? {}
+          : { modelApiKey: run.modelApiKey }),
       });
       if (runId !== runRef.current) return;
       setPacks((previous) => ({ ...previous, [output]: pack }));
@@ -213,7 +254,13 @@ export function App() {
   }
 
   function selectOutput(output: OutputId) {
-    if (getOutput(output).availability !== "available") return;
+    if (
+      !run ||
+      getOutput(output).availability !== "available" ||
+      !outputGenerationState(output, run.mode, runtime).interactive
+    ) {
+      return;
+    }
     setOutputId(output);
     setPreflightResult(null);
     setStage("studio");
@@ -223,7 +270,13 @@ export function App() {
   }
 
   function switchOutputInStudio(output: OutputId) {
-    if (getOutput(output).availability !== "available") return;
+    if (
+      !run ||
+      getOutput(output).availability !== "available" ||
+      !outputGenerationState(output, run.mode, runtime).interactive
+    ) {
+      return;
+    }
     setOutputId(output);
     setPreflightResult(null);
     if (!packs[output] && signalId) {
@@ -256,7 +309,7 @@ export function App() {
 
   function restart(panel: SourceOptionId | null = null) {
     runRef.current += 1;
-    setStage("start");
+    setStage(panel ? "workspace" : "start");
     setStartPanel(panel);
     setRun(null);
     setAnalysis(null);
@@ -279,30 +332,56 @@ export function App() {
       <header className="border-b border-line">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-x-6 gap-y-3 px-6 py-4 sm:px-10">
           <Wordmark />
-          {stage !== "start" && (
-            <>
-              <JourneyProgress current={STAGE_TO_JOURNEY[stage]} />
-              <div className="flex items-center gap-3">
-                {run?.mode === "demo" && analysis && (
-                  <ProvenanceBadge provenance={analysis.provenance} />
-                )}
-                <Button
-                  variant="ghost"
-                  onClick={() => restart()}
-                  className="text-sm"
-                >
-                  Start over
-                </Button>
-              </div>
-            </>
+          {stage !== "start" && stage !== "workspace" && (
+            <JourneyProgress current={STAGE_TO_JOURNEY[stage]} />
           )}
+          <div className="flex items-center gap-3">
+            {runtime.profile === "self_hosted" && (
+              <span className="rounded-full border border-line-strong px-3 py-1 text-xs font-medium text-ink-soft">
+                {runtime.capabilities?.installation === "private"
+                  ? "Private self-hosted install"
+                  : "Self-hosted install"}
+              </span>
+            )}
+            {stage !== "start" &&
+              stage !== "workspace" &&
+              run?.mode === "demo" &&
+              analysis && <ProvenanceBadge provenance={analysis.provenance} />}
+            {stage !== "start" && (
+              <Button
+                variant="ghost"
+                onClick={() => restart()}
+                className="text-sm"
+              >
+                Start over
+              </Button>
+            )}
+          </div>
         </div>
       </header>
 
       <main className="flex-1 px-6 py-10 sm:px-10">
-        {stage === "start" && (
+        {stage === "start" &&
+          (runtime.profile === "public_demo" ? (
+            <LandingScreen
+              onDemo={analyzeDemo}
+              onWorkspace={() => setStage("workspace")}
+            />
+          ) : (
+            <StartScreen
+              key={startPanel ?? "default"}
+              runtime={runtime}
+              initialPanel={startPanel}
+              onAnalyzeYoutube={analyzeYoutube}
+              onImport={analyzeImport}
+              onDemo={analyzeDemo}
+            />
+          ))}
+
+        {stage === "workspace" && (
           <StartScreen
-            key={startPanel ?? "default"}
+            key={startPanel ?? "workspace"}
+            runtime={runtime}
             initialPanel={startPanel}
             onAnalyzeYoutube={analyzeYoutube}
             onImport={analyzeImport}
@@ -335,6 +414,8 @@ export function App() {
         {stage === "destination" && selectedSignal && (
           <DestinationScreen
             signal={selectedSignal}
+            runtime={runtime}
+            mode={run?.mode ?? "demo"}
             onSelect={selectOutput}
             onBack={() => setStage("signals")}
           />
@@ -345,6 +426,8 @@ export function App() {
             signal={selectedSignal}
             packs={packs}
             outputId={outputId}
+            runtime={runtime}
+            mode={run?.mode ?? "demo"}
             generating={generating}
             generateError={generateError}
             onSwitchOutput={switchOutputInStudio}

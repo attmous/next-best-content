@@ -2,6 +2,10 @@
 
 import type { Signal } from "@/contracts";
 import {
+  outputGenerationState,
+  type RuntimeContext,
+} from "@/app/_lib/capabilities";
+import {
   PLATFORM_LABELS,
   TARGET_PLATFORMS,
   recommendedOutputFor,
@@ -22,10 +26,14 @@ import { Button, SectionLabel } from "@/app/_components/ui";
  */
 export function DestinationScreen({
   signal,
+  runtime,
+  mode,
   onSelect,
   onBack,
 }: {
   signal: Signal;
+  runtime: RuntimeContext;
+  mode: "live" | "demo";
   onSelect: (outputId: OutputId) => void;
   onBack: () => void;
 }) {
@@ -91,7 +99,14 @@ export function DestinationScreen({
             ) : (
               <ul className="mt-4 flex flex-col gap-3">
                 {entry.outputs.map((output) => {
-                  const isAvailable = output.availability === "available";
+                  const generation = outputGenerationState(
+                    output.id,
+                    mode,
+                    runtime,
+                  );
+                  const isAvailable =
+                    output.availability === "available" &&
+                    generation.interactive;
                   const isRecommended = output.id === recommendedId;
                   return (
                     <li key={output.id}>
@@ -130,11 +145,11 @@ export function DestinationScreen({
                             </span>
                             <span className="inline-flex items-center gap-1 rounded-full border border-line-strong px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
                               <LockIcon className="size-3" />
-                              Not available yet
+                              Not available here
                             </span>
                           </span>
                           <span className="mt-1 block text-xs leading-5 text-ink-faint">
-                            {output.unavailableReason}
+                            {generation.reason ?? output.unavailableReason}
                           </span>
                         </div>
                       )}

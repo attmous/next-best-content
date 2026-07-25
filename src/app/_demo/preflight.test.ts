@@ -30,7 +30,7 @@ describe("demo preflight evaluator", () => {
   });
 
   it("flags the deliberately long scene body in the primary demo pack", () => {
-    const result = evaluateDraftPack(draftFrom("sig-request-beginner-menu", "short"));
+    const result = evaluateDraftPack(draftFrom("sig-request-shopping-list", "short"));
     const clarity = result.checks.find((check) => check.name === "clarity");
     expect(clarity?.status).toBe("warning");
     expect(clarity?.suggestedFix).toBeDefined();
@@ -38,10 +38,10 @@ describe("demo preflight evaluator", () => {
   });
 
   it("returns ready after the flagged copy is tightened", () => {
-    const draft = draftFrom("sig-request-beginner-menu", "short");
+    const draft = draftFrom("sig-request-shopping-list", "short");
     draft.scenes = draft.scenes.map((scene) =>
       scene.body.length > 160
-        ? { ...scene, body: "Medium-low heat, keep stirring, stop when it coats the spoon." }
+        ? { ...scene, body: "Starts for slow herbs, seeds for fast growers — €19 covers it." }
         : scene,
     );
     const result = evaluateDraftPack(draft);
@@ -50,13 +50,13 @@ describe("demo preflight evaluator", () => {
   });
 
   it("passes the untouched carousel pack as ready", () => {
-    const result = evaluateDraftPack(draftFrom("sig-question-heat-setup", "carousel"));
+    const result = evaluateDraftPack(draftFrom("sig-question-watering", "carousel"));
     expect(result.verdict).toBe("ready");
     expect(result.checks.every((check) => check.status === "pass")).toBe(true);
   });
 
   it("blocks when the hook is deleted", () => {
-    const draft = draftFrom("sig-question-heat-setup", "carousel");
+    const draft = draftFrom("sig-question-watering", "carousel");
     draft.hook = "";
     const result = evaluateDraftPack(draft);
     expect(result.verdict).toBe("blocked");
@@ -66,7 +66,7 @@ describe("demo preflight evaluator", () => {
   });
 
   it("blocks emptied scene copy through the clarity check", () => {
-    const draft = draftFrom("sig-reaction-sauce-save", "short");
+    const draft = draftFrom("sig-reaction-what-failed", "short");
     draft.scenes = draft.scenes.map((scene, index) =>
       index === 2 ? { ...scene, headline: "" } : scene,
     );
@@ -78,7 +78,7 @@ describe("demo preflight evaluator", () => {
   });
 
   it("fails brand safety on performance promises", () => {
-    const draft = draftFrom("sig-reaction-sauce-save", "short");
+    const draft = draftFrom("sig-reaction-what-failed", "short");
     draft.caption = `${draft.caption} This is guaranteed to go viral.`;
     const result = evaluateDraftPack(draft);
     const safety = result.checks.find((check) => check.name === "brand_safety");
@@ -87,7 +87,7 @@ describe("demo preflight evaluator", () => {
   });
 
   it("warns when Short durations drift outside the 30–45s window", () => {
-    const draft = draftFrom("sig-reaction-sauce-save", "short");
+    const draft = draftFrom("sig-reaction-what-failed", "short");
     draft.scenes = draft.scenes.map((scene) => ({
       ...scene,
       durationSeconds: 2,
@@ -98,7 +98,7 @@ describe("demo preflight evaluator", () => {
   });
 
   it("flags a draft with no attached evidence", () => {
-    const draft = draftFrom("sig-request-beginner-menu", "short");
+    const draft = draftFrom("sig-request-shopping-list", "short");
     delete (draft as { sourceEvidence?: unknown }).sourceEvidence;
     const result = evaluateDraftPack(draft);
     const evidence = result.checks.find((check) => check.name === "evidence");

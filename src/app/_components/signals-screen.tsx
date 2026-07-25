@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { AnalyzeResponse, Signal } from "@/contracts";
+import { DEMO_ASSETS } from "@/app/_demo/fixtures";
 import type { SourceDescriptor } from "@/app/_lib/platforms";
 import { SourceReceipt } from "@/app/_components/source-receipt";
 import {
@@ -97,24 +98,33 @@ function VideoThumbnail({
 }) {
   const [failed, setFailed] = useState(false);
 
-  // Demo runs never fetch a real thumbnail: the fixture is fictional, so a
-  // labeled placeholder is the honest representation.
-  if (synthetic || failed) {
+  // Demo runs never fetch a real thumbnail: the fixture is fictional, so the
+  // locally shipped synthetic illustration is the honest representation.
+  if (synthetic) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- locally shipped synthetic SVG artwork
+      <img
+        src={DEMO_ASSETS.balconyAfter.src}
+        alt={DEMO_ASSETS.balconyAfter.alt}
+        width={160}
+        height={96}
+        className="h-24 w-40 shrink-0 rounded-xl border border-line object-cover"
+      />
+    );
+  }
+
+  if (failed) {
     return (
       <div
         role="img"
-        aria-label={
-          synthetic
-            ? "Synthetic thumbnail placeholder"
-            : "Thumbnail unavailable"
-        }
+        aria-label="Thumbnail unavailable"
         className="flex h-24 w-40 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border border-line bg-surface-raised"
       >
         <span aria-hidden="true" className="font-display text-xl text-signal">
           ▶
         </span>
         <span className="px-2 text-center text-[10px] uppercase tracking-wide text-ink-faint">
-          {synthetic ? "Synthetic fixture" : "No thumbnail"}
+          No thumbnail
         </span>
       </div>
     );
