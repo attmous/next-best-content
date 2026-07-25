@@ -1,0 +1,14 @@
+.git
+.github
+.next
+.vercel
+coverage
+node_modules
+out
+secrets
+
+.DS_Store
+*.log
+*.pem
+.env*
+!.env.example

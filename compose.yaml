@@ -1,0 +1,22 @@
+services:
+  app:
+    build:
+      context: .
+      target: runner
+    image: next-best-content:local
+    init: true
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      APP_PROFILE: self_hosted
+      APP_INSTALLATION: private
+      ENABLE_SERVER_LLM_KEY: "${ENABLE_SERVER_LLM_KEY:-false}"
+      LLM_API_KEY: "${LLM_API_KEY:-}"
+      ENABLE_OPENAI_BYOK: "${ENABLE_OPENAI_BYOK:-false}"
+      OPENAI_MODEL: "${OPENAI_MODEL:-gpt-5.6-terra}"
+      OPENAI_REASONING_EFFORT: "${OPENAI_REASONING_EFFORT:-medium}"
+      OPENAI_TIMEOUT_MS: "${OPENAI_TIMEOUT_MS:-45000}"
+      OPENAI_MAX_INPUT_CHARS: "${OPENAI_MAX_INPUT_CHARS:-600000}"
+      ENABLE_YOUTUBE_API: "${ENABLE_YOUTUBE_API:-false}"
+      YOUTUBE_POLICY_APPROVED: "${YOUTUBE_POLICY_APPROVED:-false}"
+      YOUTUBE_API_KEY: "${YOUTUBE_API_KEY:-}"
