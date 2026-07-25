@@ -8,6 +8,17 @@ comments into three evidence-backed opportunities, choose an independent
 destination, generate a six-scene YouTube Short or six-page LinkedIn document,
 and run a transparent preflight check.
 
+## Pitch artifacts
+
+[![NextBestContent jury pitch cover: Your audience already wrote your next content brief](public/pitch/previews/slide-01.webp)](public/pitch/NextBestContent-Pitch.pdf)
+
+- [View or download the six-page pitch PDF](public/pitch/NextBestContent-Pitch.pdf)
+- [Download the editable six-slide PowerPoint](public/pitch/NextBestContent-Pitch.pptx)
+- [Browse all six slide previews](public/pitch/previews/)
+
+After starting the app, open `/pitch` for the responsive web deck or `/demo`
+to jump directly into Maya Makes Space's complete synthetic journey.
+
 ## Current status
 
 The repository has two explicit server-owned application profiles. The public
