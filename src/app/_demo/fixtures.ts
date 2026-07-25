@@ -22,6 +22,7 @@ import {
 } from "@/contracts";
 
 export const DEMO_FIXTURE_ID = "maya-makes-space-balcony-v1";
+export const DEMO_FEATURED_SIGNAL_ID = "sig-reaction-what-failed";
 
 /** Fictional watch URL for the synthetic upload — the video id is invented. */
 export const DEMO_VIDEO_URL = "https://www.youtube.com/watch?v=my2m2balcny";
@@ -105,7 +106,7 @@ const wateringEvidence: Evidence[] = [
 const whatFailedEvidence: Evidence[] = [
   {
     author: "compost_confessions",
-    text: "The 30 seconds where you admitted the spinach bolted was more useful than every perfect balcony tour on this app.",
+    text: "Show the mistakes and fixes—not only the reveal. The 30 seconds where you admitted the spinach bolted was the most useful part.",
     likeCount: 231,
   },
   {
@@ -166,9 +167,9 @@ const demoSignals: Signal[] = [
     },
   },
   {
-    id: "sig-reaction-what-failed",
+    id: DEMO_FEATURED_SIGNAL_ID,
     category: "strong_reaction",
-    title: "Your honesty about what died struck a nerve",
+    title: "Show the mistakes and fixes—not only the reveal.",
     summary:
       "The strongest reaction in the whole thread: the short segment admitting the spinach bolted and aphids took the mint. Viewers say the honesty is why they trust the channel — and they want the full failure breakdown.",
     opportunityScore: 81,
@@ -180,8 +181,8 @@ const demoSignals: Signal[] = [
     evidenceCount: 26,
     evidence: whatFailedEvidence,
     recommendation: {
-      workingTitle: "What Died in My Balcony Garden (And What I'd Change)",
-      hook: "The comments blew up at the one honest moment — so here is everything that failed in the 2m² garden, and what I'd do differently.",
+      workingTitle: "3 mistakes that nearly killed my balcony garden.",
+      hook: "Three mistakes nearly killed my 2m² balcony garden. Here is what failed—and exactly how I would fix each one.",
       suggestedFormat: "short",
       rationale:
         "The audience already marked the highlight. A standalone failure breakdown serves the 26 people who asked and tests an honest 'what went wrong' series the channel can repeat.",
@@ -199,6 +200,23 @@ export const demoAnalyzeResponse: AnalyzeResponse = AnalyzeResponseSchema.parse(
 
 /** Scene text shared between the Short and carousel variants of a pack. */
 type SceneDraft = Omit<Scene, "index" | "durationSeconds">;
+type SceneDrafts = [
+  SceneDraft,
+  SceneDraft,
+  SceneDraft,
+  SceneDraft,
+  SceneDraft,
+  SceneDraft,
+];
+
+interface FormatOverride {
+  title?: string;
+  hook?: string;
+  angle?: string;
+  caption?: string;
+  cta?: string;
+  scenes?: SceneDrafts;
+}
 
 interface PackDraft {
   signalId: string;
@@ -208,14 +226,9 @@ interface PackDraft {
   hashtags: string[];
   /** Per-scene durations for the Short variant. Must total 30–45 seconds. */
   shortDurations: [number, number, number, number, number, number];
-  scenes: [
-    SceneDraft,
-    SceneDraft,
-    SceneDraft,
-    SceneDraft,
-    SceneDraft,
-    SceneDraft,
-  ];
+  scenes: SceneDrafts;
+  /** Destination-aware demo copy without stretching the shared contract. */
+  formatOverrides?: Partial<Record<ContentFormat, FormatOverride>>;
 }
 
 const packDrafts: PackDraft[] = [
@@ -350,9 +363,9 @@ const packDrafts: PackDraft[] = [
     ],
   },
   {
-    signalId: "sig-reaction-what-failed",
+    signalId: DEMO_FEATURED_SIGNAL_ID,
     angle:
-      "Give the strongest reaction its own video: the full, honest breakdown of what died in the balcony garden and what a restart would change.",
+      "Answer the strongest reaction with three concrete mistakes, the damage each caused, and the fix Maya would use on a restart.",
     caption:
       "You asked for the full failure list, so here it is: what died in the 2m² balcony garden, why it died, and what I'd change on a restart. Failure is data. Tell me what died on your balcony this year — honest answers only.",
     cta: "Share your own balcony failure in the comments",
@@ -413,11 +426,74 @@ const packDrafts: PackDraft[] = [
           "The garden you saw in the tour is built on this list. Failure is data — tell me what died on your balcony.",
       },
     ],
+    formatOverrides: {
+      carousel: {
+        title: "6 decisions behind a 2m² food garden.",
+        hook:
+          "The finished balcony makes more sense when you can see the six decisions shaped by everything that failed first.",
+        angle:
+          "Turn the audience request for mistakes and fixes into six practical design decisions readers can save before starting a small-space food garden.",
+        caption:
+          "The finished 2m² food garden came after the failures. These are the six decisions that changed the second attempt—from mapping the light to treating every loss as a design note. Save this before you plan a small-space garden, and tell me which decision you would make first.",
+        cta: "Save the six decisions for your own small-space garden",
+        scenes: [
+          {
+            headline: "1 · Map the light first",
+            body: "The bolted spinach revealed the real sun path. Mark full sun, reflected heat, and the one cool corner before buying a single plant.",
+            visualDirection:
+              "Top-down balcony plan with the six-hour sun path and shaded corner clearly marked.",
+            voiceover:
+              "Decision one: map the light before shopping. The failed spinach showed exactly where the balcony needed shade-loving crops.",
+          },
+          {
+            headline: "2 · Choose containers before crops",
+            body: "Two square meters means every pot needs a job. Railing boxes create growing space without taking away the only place to stand.",
+            visualDirection:
+              "Simple footprint diagram comparing floor pots with railing planters.",
+            voiceover:
+              "Decision two: design the container footprint first, then choose crops that fit it.",
+          },
+          {
+            headline: "3 · Start with fewer varieties",
+            body: "Half as many crops made the watering routine learnable. Depth and consistency beat a crowded first-season wish list.",
+            visualDirection:
+              "A crowded planting list pared back to a focused set of herbs, tomatoes, spinach, and radishes.",
+            voiceover:
+              "Decision three: grow fewer things well. Variety was exciting, but consistency kept the second garden alive.",
+          },
+          {
+            headline: "4 · Water by soil, not by clock",
+            body: "The two-knuckle check replaced guesswork. Measured pours and a visible handoff plan beat self-watering gadgets.",
+            visualDirection:
+              "Moisture check, measured jug, and a simple neighbor handoff card.",
+            voiceover:
+              "Decision four: let the soil decide. A repeatable check and a human backup were safer than the gadget that drowned the basil.",
+          },
+          {
+            headline: "5 · Quarantine every new plant",
+            body: "Three sticky mint leaves became an aphid takeover. New plants now wait apart for a week before joining the balcony.",
+            visualDirection:
+              "One new herb pot isolated beside a seven-day inspection checklist.",
+            voiceover:
+              "Decision five: quarantine new plants. One week apart would have stopped the aphids before they spread.",
+          },
+          {
+            headline: "6 · Keep the failure notes",
+            body: "The reveal is not the whole story. A tiny log of what died, why, and the next fix became the brief for every better decision.",
+            visualDirection:
+              "The thriving balcony beside a compact failure-and-fix notebook.",
+            voiceover:
+              "Decision six: keep the failure notes. The garden that survived was designed by the one that did not.",
+          },
+        ],
+      },
+    },
   },
 ];
 
 function buildScenes(draft: PackDraft, format: ContentFormat): Scene[] {
-  return draft.scenes.map((scene, index) => ({
+  const scenes = draft.formatOverrides?.[format]?.scenes ?? draft.scenes;
+  return scenes.map((scene, index) => ({
     ...scene,
     index,
     durationSeconds: format === "short" ? draft.shortDurations[index] : 0,
@@ -439,15 +515,17 @@ export function buildDemoContentPack(
     throw new Error(`Unknown demo signal: ${signalId}`);
   }
 
+  const formatOverride = draft.formatOverrides?.[format];
+
   return ContentPackSchema.parse({
     id: `pack-${signalId}-${format}`,
     format,
-    title: signal.recommendation.workingTitle,
-    hook: signal.recommendation.hook,
-    angle: draft.angle,
+    title: formatOverride?.title ?? signal.recommendation.workingTitle,
+    hook: formatOverride?.hook ?? signal.recommendation.hook,
+    angle: formatOverride?.angle ?? draft.angle,
     scenes: buildScenes(draft, format),
-    caption: draft.caption,
-    cta: draft.cta,
+    caption: formatOverride?.caption ?? draft.caption,
+    cta: formatOverride?.cta ?? draft.cta,
     hashtags: draft.hashtags,
     sourceEvidence: signal.evidence,
     sourceSignal: signal,

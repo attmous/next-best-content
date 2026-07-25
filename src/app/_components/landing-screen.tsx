@@ -1,9 +1,17 @@
 "use client";
 
-import { DEMO_ASSETS, demoAnalyzeResponse } from "@/app/_demo/fixtures";
+import Link from "next/link";
+
+import {
+  DEMO_ASSETS,
+  DEMO_FEATURED_SIGNAL_ID,
+  buildDemoContentPack,
+  demoAnalyzeResponse,
+} from "@/app/_demo/fixtures";
 import {
   GITHUB_SETUP_URL,
   LANDING_CTA_PRIMARY,
+  LANDING_CTA_PITCH,
   LANDING_CTA_SECONDARY,
   LANDING_HEADLINE,
   TRUST_POINTS,
@@ -38,7 +46,18 @@ export function LandingScreen({
   onWorkspace: () => void;
 }) {
   const signals = demoAnalyzeResponse.signals;
-  const topEvidence = signals[0].evidence[0];
+  const featuredSignal =
+    signals.find((signal) => signal.id === DEMO_FEATURED_SIGNAL_ID) ??
+    signals[0];
+  const topEvidence = featuredSignal.evidence[0];
+  const featuredShort = buildDemoContentPack(
+    DEMO_FEATURED_SIGNAL_ID,
+    "short",
+  );
+  const featuredDocument = buildDemoContentPack(
+    DEMO_FEATURED_SIGNAL_ID,
+    "carousel",
+  );
 
   return (
     <div className="stage-enter relative mx-auto flex w-full max-w-6xl flex-col gap-16 lg:gap-20">
@@ -67,11 +86,17 @@ export function LandingScreen({
             <Button onClick={onDemo} className="px-7 py-3.5 text-base">
               {LANDING_CTA_PRIMARY}
             </Button>
+            <Link
+              href="/pitch"
+              className="inline-flex items-center rounded-xl border border-line-strong px-5 py-3 text-sm font-medium text-ink transition-colors hover:bg-surface-raised"
+            >
+              {LANDING_CTA_PITCH}
+            </Link>
             <a
               href={GITHUB_SETUP_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-xl border border-line-strong px-5 py-3 text-sm text-ink transition-colors hover:bg-surface-raised"
+              className="inline-flex items-center gap-2 px-3 py-3 text-sm text-ink-soft transition-colors hover:text-ink"
             >
               <ExternalLinkIcon className="size-4" />
               {LANDING_CTA_SECONDARY}
@@ -116,7 +141,7 @@ export function LandingScreen({
             </blockquote>
             <p className="mt-1.5 text-[11px] text-ink-faint">
               {topEvidence.author} · {topEvidence.likeCount} likes ·{" "}
-              {signals[0].evidenceCount} supporting comments
+              {featuredSignal.evidenceCount} supporting comments
             </p>
           </PreviewCard>
           <PreviewCard
@@ -124,11 +149,13 @@ export function LandingScreen({
             step="Decide"
             image={DEMO_ASSETS.planters}
           >
-            <p className="text-xs font-semibold text-ink">{signals[0].title}</p>
+            <p className="text-xs font-semibold text-ink">
+              {featuredSignal.title}
+            </p>
             <p className="mt-1.5 text-[11px] text-ink-faint">
               Opportunity score{" "}
               <span className="font-display text-sm font-bold text-signal">
-                {signals[0].opportunityScore}
+                {featuredSignal.opportunityScore}
               </span>{" "}
               / 100 · one of exactly three signals
             </p>
@@ -139,11 +166,10 @@ export function LandingScreen({
             image={DEMO_ASSETS.watering}
           >
             <p className="text-xs font-semibold text-ink">
-              “{signals[1].recommendation.workingTitle}”
+              “{featuredShort.title}”
             </p>
             <p className="mt-1.5 text-[11px] text-ink-faint">
-              Six scenes · YouTube Short or LinkedIn document — source and
-              destination are independent
+              Six scenes · LinkedIn alternative: “{featuredDocument.title}”
             </p>
           </PreviewCard>
           <PreviewCard

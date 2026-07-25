@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type {
   AnalyzeResponse,
@@ -90,7 +90,7 @@ interface AnalysisRun {
   modelApiKey?: string;
 }
 
-export function App() {
+export function App({ autoStartDemo = false }: { autoStartDemo?: boolean }) {
   const [stage, setStage] = useState<Stage>("start");
   const [runtime, setRuntime] = useState<RuntimeContext>(PUBLIC_RUNTIME);
   const [run, setRun] = useState<AnalysisRun | null>(null);
@@ -112,6 +112,7 @@ export function App() {
   /** Increments on restart so stale async results never land. */
   const runRef = useRef(0);
   const isFirstRender = useRef(true);
+  const autoStartedDemo = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -135,7 +136,7 @@ export function App() {
     return () => cancelAnimationFrame(frame);
   }, [stage]);
 
-  async function startAnalyze(nextRun: AnalysisRun) {
+  const startAnalyze = useCallback(async (nextRun: AnalysisRun) => {
     const runId = ++runRef.current;
     setRun(nextRun);
     setAnalysis(null);
@@ -166,7 +167,7 @@ export function App() {
       setAnalysisError(asUiError(settled.reason));
       setStage("analysis-error");
     }
-  }
+  }, []);
 
   function analyzeYoutube(url: string, modelApiKey?: string) {
     void startAnalyze({
@@ -197,14 +198,20 @@ export function App() {
     });
   }
 
-  function analyzeDemo() {
+  const analyzeDemo = useCallback(() => {
     void startAnalyze({
       mode: "demo",
       url: DEMO_VIDEO_URL,
       analyzeSource: { type: "demo" },
       descriptor: { mode: "demo", platform: "youtube", url: DEMO_VIDEO_URL },
     });
-  }
+  }, [startAnalyze]);
+
+  useEffect(() => {
+    if (!autoStartDemo || autoStartedDemo.current) return;
+    autoStartedDemo.current = true;
+    analyzeDemo();
+  }, [analyzeDemo, autoStartDemo]);
 
   function chooseSignal(id: string) {
     if (!analysis) return;
