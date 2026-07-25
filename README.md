@@ -9,16 +9,31 @@ or six-slide carousel, and run a transparent preflight check.
 
 ## Current status
 
-This repository is the public, contract-first hackathon base. It is intentionally
-non-functional while parallel implementation streams build against one shared
-schema. The three core routes currently return `501 Not Implemented`; they must
-not be treated as a working API or connected to paid production credentials.
+The repository now contains a working, credential-free MVP journey. The web
+experience supports an explicit synthetic demo from audience signals through
+content editing, deterministic preflight, and honest local exports. Live
+analysis and generation remain deliberately disabled until their policy-gated
+providers are implemented.
 
-| Route | Intended responsibility | Base behavior |
+| Route | Responsibility | Current behavior |
 | --- | --- | --- |
-| `POST /api/analyze` | Normalize a source and return exactly three evidence-backed signals | `501` |
-| `POST /api/generate` | Turn one signal into exactly six Short scenes or carousel slides | `501` |
-| `POST /api/preflight` | Apply deterministic quality and safety checks to a content pack | `501` |
+| `POST /api/analyze` | Normalize a source and return exactly three evidence-backed signals | Explicit `501 Not Implemented` stub |
+| `POST /api/generate` | Turn one signal into exactly six Short scenes or carousel slides | Explicit `501 Not Implemented` stub |
+| `POST /api/preflight` | Apply deterministic quality and safety checks to a content pack | Implemented with typed `200`, `400`, and `500` responses |
+
+### What works now
+
+- A responsive Listen → Decide → Create → Preflight journey at `/`.
+- An explicit, clearly labeled synthetic demo with exactly three audience
+  signals and six-scene Short or six-slide carousel drafts.
+- Inline editing, format switching, and seven transparent preflight checks.
+- Caption copying, storyboard Markdown download, and locally rendered carousel
+  PNG export.
+- Safe request validation and typed API errors with `Cache-Control: no-store`.
+
+MP4 rendering, generated narration, live YouTube analysis, and model-backed
+content generation remain unavailable. The interface labels those limitations
+instead of returning plausible fake results.
 
 ## Source modes
 
@@ -28,7 +43,7 @@ and must never silently replace creator-provided or live data.
 | Source | MVP intent | Status |
 | --- | --- | --- |
 | Creator import | Validate up to 100 comments supplied as JSON or CSV by a creator who has the right to use them | Planned |
-| Synthetic demo | Reproduce the full flow with clearly labeled, fictional fixture data | Planned |
+| Synthetic demo | Reproduce the full flow with clearly labeled, fictional fixture data | Implemented; explicit opt-in only |
 | YouTube Data API | Read video metadata and top-level comments through an isolated adapter | Scaffolded, disabled by default |
 
 The YouTube adapter may be enabled only when both `ENABLE_YOUTUBE_API=true` and
@@ -49,7 +64,7 @@ access controls, abuse protection, and provider terms.
 
 ## Local setup
 
-Next.js 16 requires Node.js 20.9 or newer.
+Use Node.js 22 or newer, matching the repository's declared engine.
 
 ```bash
 npm ci
@@ -106,12 +121,11 @@ deployment secret store.
   owns the web experience.
 - The MVP is stateless: no authentication, database, or permanent history.
 
-`main` is the green integration baseline. Parallel streams branch from the same
-baseline into separate worktrees (`contracts`, `server-api`, and
-`frontend-integration`), stay inside their ownership boundaries, and merge
-through reviewed pull requests only after relevant tests, lint, and build
-checks pass. Changes to shared contracts, package files, or the lockfile require
-coordination before editing.
+`main` is the green integration baseline. Contract, server API, frontend, and
+foundation work stays inside its ownership boundary and merges through reviewed
+pull requests only after relevant tests, lint, and build checks pass. Changes to
+shared contracts, package files, or the lockfile require coordination before
+editing.
 
 ## Out of scope
 
