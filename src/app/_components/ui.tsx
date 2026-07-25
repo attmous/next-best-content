@@ -1,6 +1,7 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 import type { Provenance, SignalCategory } from "@/contracts";
+import { CategoryIcon } from "@/app/_components/icons";
 
 type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
 
@@ -99,7 +100,8 @@ export const CATEGORY_LABELS: Record<SignalCategory, string> = {
 
 export function CategoryBadge({ category }: { category: SignalCategory }) {
   return (
-    <span className="inline-flex items-center rounded-full border border-line-strong px-3 py-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+      <CategoryIcon category={category} className="size-3.5 text-signal" />
       {CATEGORY_LABELS[category]}
     </span>
   );

@@ -7,6 +7,11 @@ import {
   recommendedOutputFor,
   type OutputId,
 } from "@/app/_lib/platforms";
+import {
+  HourglassIcon,
+  LockIcon,
+  PlatformIcon,
+} from "@/app/_components/icons";
 import { Button, SectionLabel } from "@/app/_components/ui";
 
 /**
@@ -58,11 +63,22 @@ export function DestinationScreen({
             }`}
           >
             <div className="flex items-center justify-between gap-3">
-              <h2 className="font-display text-lg font-bold text-ink">
+              <h2 className="flex items-center gap-3 font-display text-lg font-bold text-ink">
+                <span
+                  aria-hidden="true"
+                  className={`grid size-10 place-items-center rounded-xl ${
+                    entry.availability === "coming_soon"
+                      ? "bg-surface text-ink-faint"
+                      : "bg-surface-raised text-ink"
+                  }`}
+                >
+                  <PlatformIcon platform={entry.platform} className="size-5" />
+                </span>
                 {PLATFORM_LABELS[entry.platform]}
               </h2>
               {entry.availability === "coming_soon" && (
-                <span className="rounded-full border border-line-strong px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                <span className="inline-flex items-center gap-1 rounded-full border border-line-strong px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                  <HourglassIcon className="size-3" />
                   Coming soon
                 </span>
               )}
@@ -112,7 +128,8 @@ export function DestinationScreen({
                             <span className="font-semibold text-ink-faint">
                               {output.title}
                             </span>
-                            <span className="rounded-full border border-line-strong px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                            <span className="inline-flex items-center gap-1 rounded-full border border-line-strong px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                              <LockIcon className="size-3" />
                               Not available yet
                             </span>
                           </span>

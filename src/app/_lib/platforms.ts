@@ -58,8 +58,7 @@ export const SOURCE_OPTIONS: SourceOption[] = [
     mode: "live",
     availability: "gated",
     title: "YouTube video",
-    description:
-      "Paste a video URL and analyze its live comment section through the YouTube Data API.",
+    description: "Analyze a video's live comment section.",
     unavailableReason:
       "Live YouTube access runs only when this environment's API and policy gates are both enabled. You can still submit — if the gates are off you'll get a clear error, never substituted data. Importing comments avoids the YouTube gates but still needs the analysis backend.",
   },
@@ -70,7 +69,7 @@ export const SOURCE_OPTIONS: SourceOption[] = [
     availability: "available",
     title: "Import comments",
     description:
-      "Prepare up to 100 comments you have the right to use — exported from YouTube, LinkedIn, or anywhere else — as JSON, CSV, or pasted text. Analysis still depends on this environment's backend.",
+      "Up to 100 comments you have the right to use — JSON, CSV, or pasted text.",
   },
   {
     id: "demo",
@@ -78,8 +77,7 @@ export const SOURCE_OPTIONS: SourceOption[] = [
     mode: "demo",
     availability: "available",
     title: "Synthetic demo",
-    description:
-      "Walk the full journey on clearly labeled fictional data for Adam's channel — nothing is fetched from any platform.",
+    description: "The full journey on labeled fictional data.",
   },
   {
     id: "linkedin-live",
@@ -87,8 +85,7 @@ export const SOURCE_OPTIONS: SourceOption[] = [
     mode: "live",
     availability: "gated",
     title: "LinkedIn post",
-    description:
-      "Analyze the comments under one of your LinkedIn posts directly.",
+    description: "Analyze comments under one of your posts.",
     unavailableReason:
       "Reading LinkedIn comments requires LinkedIn's restricted Community Management API approval, which this build does not have. Export your post's comments and use Import instead.",
   },
@@ -132,8 +129,7 @@ export const TARGET_PLATFORMS: TargetPlatformEntry[] = [
         id: "youtube-short",
         platform: "youtube",
         title: "YouTube Short",
-        description:
-          "A six-scene vertical video storyboard with hook, voiceover, and timings.",
+        description: "Six-scene vertical storyboard with voiceover.",
         availability: "available",
         contractFormat: "short",
       },
@@ -147,8 +143,7 @@ export const TARGET_PLATFORMS: TargetPlatformEntry[] = [
         id: "linkedin-document",
         platform: "linkedin",
         title: "Document post",
-        description:
-          "A six-page swipeable document (carousel) with post text, CTA, and hashtags.",
+        description: "Six-page swipeable document with post text.",
         availability: "available",
         contractFormat: "carousel",
       },
@@ -169,14 +164,14 @@ export const TARGET_PLATFORMS: TargetPlatformEntry[] = [
     availability: "coming_soon",
     outputs: [],
     comingSoonCopy:
-      "X / Twitter threads and posts are on the roadmap. Nothing is drafted or published for X yet.",
+      "Threads and posts are on the roadmap — nothing is drafted or published yet.",
   },
   {
     platform: "facebook",
     availability: "coming_soon",
     outputs: [],
     comingSoonCopy:
-      "Facebook posts and Reels are on the roadmap. Nothing is drafted or published for Facebook yet.",
+      "Posts and Reels are on the roadmap — nothing is drafted or published yet.",
   },
 ];
 

@@ -1,3 +1,5 @@
+import { JOURNEY_ICONS } from "@/app/_components/icons";
+
 export type JourneyStep = "listen" | "decide" | "create" | "preflight";
 
 export const JOURNEY_STEPS: Array<{
@@ -31,18 +33,31 @@ export const JOURNEY_STEPS: Array<{
 export function JourneyExplainer() {
   return (
     <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {JOURNEY_STEPS.map((step, index) => (
-        <li
-          key={step.id}
-          className="rounded-2xl border border-line bg-surface p-5"
-        >
-          <p className="font-display text-sm text-signal">0{index + 1}</p>
-          <p className="mt-2 font-semibold text-ink">{step.title}</p>
-          <p className="mt-1 text-sm leading-5 text-ink-soft">
-            {step.description}
-          </p>
-        </li>
-      ))}
+      {JOURNEY_STEPS.map((step, index) => {
+        const Icon = JOURNEY_ICONS[step.id];
+        return (
+          <li
+            key={step.id}
+            className="rounded-2xl border border-line bg-surface p-5"
+          >
+            <div className="flex items-center justify-between">
+              <span
+                aria-hidden="true"
+                className="grid size-9 place-items-center rounded-xl bg-surface-raised text-signal"
+              >
+                <Icon className="size-4.5" />
+              </span>
+              <p className="font-display text-sm text-ink-faint">
+                0{index + 1}
+              </p>
+            </div>
+            <p className="mt-3 font-semibold text-ink">{step.title}</p>
+            <p className="mt-1 text-sm leading-5 text-ink-soft">
+              {step.description}
+            </p>
+          </li>
+        );
+      })}
     </ol>
   );
 }
