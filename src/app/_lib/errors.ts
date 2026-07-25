@@ -30,7 +30,7 @@ const ERROR_COPY: Record<UiErrorCode, ErrorCopy> = {
   VALIDATION_ERROR: {
     title: "That request didn't validate",
     description:
-      "Something about the request didn't match what the analysis service expects. Check the video URL and try again.",
+      "Something about the request didn't match what the service expects. Check the source and destination details, then try again.",
     retryable: true,
     offerDemo: true,
     offerImport: false,
@@ -54,7 +54,7 @@ const ERROR_COPY: Record<UiErrorCode, ErrorCopy> = {
   TOO_FEW_COMMENTS: {
     title: "Not enough comments to find a signal",
     description:
-      "This video doesn't have enough comments yet for a trustworthy read on your audience. Try a video with a busier comment section.",
+      "This source doesn't contain enough usable comments for a trustworthy read on your audience. Choose another source or import at least three comments.",
     retryable: false,
     offerDemo: true,
     offerImport: true,
@@ -68,9 +68,9 @@ const ERROR_COPY: Record<UiErrorCode, ErrorCopy> = {
     offerImport: true,
   },
   MODEL_AUTHENTICATION_FAILED: {
-    title: "The analysis model rejected its credentials",
+    title: "The model provider rejected the credential",
     description:
-      "The model provider didn't accept the configured API key. The key needs to be checked on the server — nothing on your end is wrong.",
+      "If you supplied a request-scoped API key, check it and try again. Otherwise, the server-managed credential needs to be checked by the operator.",
     retryable: false,
     offerDemo: true,
     offerImport: false,
@@ -78,7 +78,7 @@ const ERROR_COPY: Record<UiErrorCode, ErrorCopy> = {
   INVALID_MODEL_OUTPUT: {
     title: "The model returned something we couldn't trust",
     description:
-      "The analysis model produced an output that failed our validation checks, so we stopped rather than show you unreliable results. Trying again usually resolves this.",
+      "The model produced an analysis or generation result that failed our validation checks, so we stopped rather than show you unreliable output. Trying again usually resolves this.",
     retryable: true,
     offerDemo: true,
     offerImport: false,
@@ -92,17 +92,17 @@ const ERROR_COPY: Record<UiErrorCode, ErrorCopy> = {
     offerImport: false,
   },
   FEATURE_DISABLED: {
-    title: "Live access is disabled for this environment",
+    title: "This capability is disabled for this environment",
     description:
-      "The required integration is switched off here — live YouTube analysis needs both API and policy gates enabled. Importing comments avoids those platform gates, but still needs the analysis backend.",
+      "This request needs a capability that isn't enabled here. Check the available source, model, and destination options, or ask the operator to enable it.",
     retryable: false,
     offerDemo: true,
-    offerImport: true,
+    offerImport: false,
   },
   NOT_IMPLEMENTED: {
-    title: "The live pipeline isn't wired up yet",
+    title: "This capability isn't available yet",
     description:
-      "This build's backend routes are still under construction, so live analysis can't run. The synthetic demo walks the identical journey with clearly labeled fictional data.",
+      "This optional integration hasn't been wired up in this build. Choose an available source or destination, or explore the clearly labeled synthetic demo.",
     retryable: false,
     offerDemo: true,
     offerImport: false,
