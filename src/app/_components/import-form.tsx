@@ -2,7 +2,7 @@
 
 import { useId, useState, type FormEvent } from "react";
 
-import type { Evidence } from "@/contracts";
+import type { AnalyzeSource, Evidence } from "@/contracts";
 import {
   detectImportKind,
   parseImportedComments,
@@ -18,8 +18,27 @@ import { Button } from "@/app/_components/ui";
 export interface ImportSubmission {
   comments: Evidence[];
   platform: SourcePlatformTag;
+  rightsConfirmed: true;
   sourceUrl: string;
   fileName?: string;
+}
+
+type ImportAnalyzeSource = Extract<AnalyzeSource, { type: "import" }>;
+
+export function toImportAnalyzeSource(
+  submission: ImportSubmission,
+): ImportAnalyzeSource {
+  const platform =
+    submission.platform === "youtube" || submission.platform === "linkedin"
+      ? submission.platform
+      : "other";
+
+  return {
+    type: "import",
+    platform,
+    rightsConfirmed: submission.rightsConfirmed,
+    comments: submission.comments,
+  };
 }
 
 const PLATFORM_TAGS: SourcePlatformTag[] = [
@@ -32,8 +51,8 @@ const PLATFORM_TAGS: SourcePlatformTag[] = [
 
 /**
  * Creator comment import: file upload or paste, an explicit original-platform
- * tag, and the original content URL (the current analyze contract requires a
- * URL on every request). Parsing happens entirely in the browser.
+ * tag, and the original content URL for visible source traceability. Parsing
+ * happens entirely in the browser.
  */
 export function ImportForm({
   initialPlatform = "youtube",
@@ -49,6 +68,7 @@ export function ImportForm({
   const [sourceUrl, setSourceUrl] = useState("");
   const [rawText, setRawText] = useState("");
   const [fileName, setFileName] = useState<string | null>(null);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [parsed, setParsed] = useState<{
     comments: Evidence[];
     warnings: string[];
@@ -80,7 +100,7 @@ export function ImportForm({
     const trimmedUrl = sourceUrl.trim();
     if (trimmedUrl.length === 0) {
       setError(
-        "Add the link to the original video or post — the current API requires a source URL with every request.",
+        "Add the original video or post link so this import stays traceable to its source.",
       );
       return;
     }
@@ -97,6 +117,12 @@ export function ImportForm({
       setError("That source link doesn't look like a URL.");
       return;
     }
+    if (!rightsConfirmed) {
+      setError(
+        "Confirm that you have the right to use these comments before analysis.",
+      );
+      return;
+    }
 
     const result = parseImportedComments(
       rawText,
@@ -111,6 +137,7 @@ export function ImportForm({
     onSubmit({
       comments: result.comments,
       platform,
+      rightsConfirmed: true,
       sourceUrl: normalizedUrl,
       fileName: fileName ?? undefined,
     });
@@ -156,7 +183,7 @@ export function ImportForm({
           Link to the original video or post
         </label>
         <p className="mt-0.5 text-xs text-ink-faint">
-          The analyze API currently requires a source URL with every request.
+          Required by this import flow to keep its source visible.
         </p>
         <input
           id={`${fieldId}-url`}
@@ -242,6 +269,26 @@ export function ImportForm({
           </p>
         </div>
       )}
+
+      <label
+        htmlFor={`${fieldId}-rights`}
+        className="flex items-start gap-2.5 rounded-xl border border-line bg-surface-raised px-4 py-3 text-sm text-ink"
+      >
+        <input
+          id={`${fieldId}-rights`}
+          type="checkbox"
+          required
+          checked={rightsConfirmed}
+          onChange={(event) => {
+            setRightsConfirmed(event.target.checked);
+            if (event.target.checked) setError(null);
+          }}
+          className="mt-0.5 size-4 shrink-0 accent-signal"
+        />
+        <span>
+          I confirm that I have the right to use these comments for analysis.
+        </span>
+      </label>
 
       {error && (
         <p role="alert" className="text-sm text-danger">

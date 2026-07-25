@@ -24,7 +24,10 @@ import { DEMO_VIDEO_URL } from "@/app/_demo/fixtures";
 import { DestinationScreen } from "@/app/_components/destination-screen";
 import { ErrorScreen } from "@/app/_components/error-screen";
 import { ExportScreen } from "@/app/_components/export-screen";
-import type { ImportSubmission } from "@/app/_components/import-form";
+import {
+  toImportAnalyzeSource,
+  type ImportSubmission,
+} from "@/app/_components/import-form";
 import { JourneyProgress, type JourneyStep } from "@/app/_components/journey";
 import { PreflightScreen } from "@/app/_components/preflight-screen";
 import { ProgressScreen } from "@/app/_components/progress-screen";
@@ -151,7 +154,7 @@ export function App() {
     void startAnalyze({
       mode: "live",
       url: submission.sourceUrl,
-      analyzeSource: { type: "import", comments: submission.comments },
+      analyzeSource: toImportAnalyzeSource(submission),
       descriptor: {
         mode: "import",
         platform: submission.platform,
