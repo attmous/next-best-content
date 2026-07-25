@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 
 import type {
   AnalyzeResponse,
-  ContentFormat,
-  ContentPack,
+  AnalyzeSource,
   PreflightResponse,
+  ContentPack,
 } from "@/contracts";
 import {
   ApiClientError,
@@ -14,9 +14,17 @@ import {
   type ApiMode,
 } from "@/app/_lib/api-client";
 import { toUiError, type UiError } from "@/app/_lib/errors";
+import {
+  getOutput,
+  type OutputId,
+  type SourceDescriptor,
+  type SourceOptionId,
+} from "@/app/_lib/platforms";
 import { DEMO_VIDEO_URL } from "@/app/_demo/fixtures";
+import { DestinationScreen } from "@/app/_components/destination-screen";
 import { ErrorScreen } from "@/app/_components/error-screen";
 import { ExportScreen } from "@/app/_components/export-screen";
+import type { ImportSubmission } from "@/app/_components/import-form";
 import { JourneyProgress, type JourneyStep } from "@/app/_components/journey";
 import { PreflightScreen } from "@/app/_components/preflight-screen";
 import { ProgressScreen } from "@/app/_components/progress-screen";
@@ -30,6 +38,7 @@ type Stage =
   | "analyzing"
   | "analysis-error"
   | "signals"
+  | "destination"
   | "studio"
   | "preflight"
   | "export";
@@ -38,6 +47,7 @@ const STAGE_TO_JOURNEY: Record<Exclude<Stage, "start">, JourneyStep> = {
   analyzing: "listen",
   "analysis-error": "listen",
   signals: "decide",
+  destination: "decide",
   studio: "create",
   preflight: "preflight",
   export: "preflight",
@@ -57,17 +67,24 @@ function asUiError(error: unknown): UiError {
   return toUiError("INTERNAL_ERROR");
 }
 
+interface AnalysisRun {
+  mode: ApiMode;
+  url: string;
+  analyzeSource: AnalyzeSource;
+  descriptor: SourceDescriptor;
+}
+
 export function App() {
   const [stage, setStage] = useState<Stage>("start");
-  const [mode, setMode] = useState<ApiMode>("live");
-  const [sourceUrl, setSourceUrl] = useState("");
+  const [run, setRun] = useState<AnalysisRun | null>(null);
+  const [startPanel, setStartPanel] = useState<SourceOptionId | null>(null);
   const [analysis, setAnalysis] = useState<AnalyzeResponse | null>(null);
   const [analysisError, setAnalysisError] = useState<UiError | null>(null);
   const [signalId, setSignalId] = useState<string | null>(null);
-  const [packs, setPacks] = useState<
-    Partial<Record<ContentFormat, ContentPack>>
-  >({});
-  const [activeFormat, setActiveFormat] = useState<ContentFormat>("short");
+  const [outputId, setOutputId] = useState<OutputId>("youtube-short");
+  const [packs, setPacks] = useState<Partial<Record<OutputId, ContentPack>>>(
+    {},
+  );
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<UiError | null>(null);
   const [preflightResult, setPreflightResult] =
@@ -91,24 +108,26 @@ export function App() {
     return () => cancelAnimationFrame(frame);
   }, [stage]);
 
-  async function startAnalyze(url: string, nextMode: ApiMode) {
-    const run = ++runRef.current;
-    setMode(nextMode);
-    setSourceUrl(url);
+  async function startAnalyze(nextRun: AnalysisRun) {
+    const runId = ++runRef.current;
+    setRun(nextRun);
     setAnalysis(null);
     setAnalysisError(null);
+    setSignalId(null);
+    setPacks({});
+    setPreflightResult(null);
     setStage("analyzing");
 
-    const client = createApiClient(nextMode);
+    const client = createApiClient(nextRun.mode);
     const [settled] = await Promise.allSettled([
       client.analyze({
-        youtubeUrl: url,
-        source: { type: nextMode === "demo" ? "demo" : "youtube" },
+        youtubeUrl: nextRun.url,
+        source: nextRun.analyzeSource,
       }),
       sleep(MIN_ANALYSIS_MS),
     ]);
 
-    if (run !== runRef.current) return;
+    if (runId !== runRef.current) return;
 
     if (settled.status === "fulfilled") {
       setAnalysis(settled.value);
@@ -119,88 +138,129 @@ export function App() {
     }
   }
 
+  function analyzeYoutube(url: string) {
+    void startAnalyze({
+      mode: "live",
+      url,
+      analyzeSource: { type: "youtube" },
+      descriptor: { mode: "live", platform: "youtube", url },
+    });
+  }
+
+  function analyzeImport(submission: ImportSubmission) {
+    void startAnalyze({
+      mode: "live",
+      url: submission.sourceUrl,
+      analyzeSource: { type: "import", comments: submission.comments },
+      descriptor: {
+        mode: "import",
+        platform: submission.platform,
+        url: submission.sourceUrl,
+        fileName: submission.fileName,
+        importedCommentCount: submission.comments.length,
+      },
+    });
+  }
+
+  function analyzeDemo() {
+    void startAnalyze({
+      mode: "demo",
+      url: DEMO_VIDEO_URL,
+      analyzeSource: { type: "demo" },
+      descriptor: { mode: "demo", platform: "youtube", url: DEMO_VIDEO_URL },
+    });
+  }
+
   function chooseSignal(id: string) {
     if (!analysis) return;
-    const signal = analysis.signals.find((item) => item.id === id);
-    if (!signal) return;
+    if (!analysis.signals.some((item) => item.id === id)) return;
     setSignalId(id);
     setPacks({});
     setGenerateError(null);
     setPreflightResult(null);
     setPreflightError(null);
-    const format = signal.recommendation.suggestedFormat;
-    setActiveFormat(format);
-    setStage("studio");
-    void generatePackFor(id, format);
+    setStage("destination");
   }
 
-  /** Takes the signal id explicitly so it also works before state settles. */
-  async function generatePackFor(id: string, format: ContentFormat) {
-    if (!analysis) return;
+  /** Takes ids explicitly so it also works before state settles. */
+  async function generatePackFor(id: string, output: OutputId) {
+    if (!analysis || !run) return;
     const signal = analysis.signals.find((item) => item.id === id);
-    if (!signal) return;
+    const format = getOutput(output).contractFormat;
+    if (!signal || !format) return;
 
-    const run = runRef.current;
+    const runId = runRef.current;
     setGenerating(true);
     setGenerateError(null);
     try {
-      const pack = await createApiClient(mode).generate({
+      const pack = await createApiClient(run.mode).generate({
         video: analysis.video,
         signal,
         format,
         provenance: analysis.provenance,
       });
-      if (run !== runRef.current) return;
-      setPacks((previous) => ({ ...previous, [format]: pack }));
+      if (runId !== runRef.current) return;
+      setPacks((previous) => ({ ...previous, [output]: pack }));
     } catch (error) {
-      if (run !== runRef.current) return;
+      if (runId !== runRef.current) return;
       setGenerateError(asUiError(error));
     } finally {
-      if (run === runRef.current) setGenerating(false);
+      if (runId === runRef.current) setGenerating(false);
     }
   }
 
-  function selectFormat(format: ContentFormat) {
-    setActiveFormat(format);
+  function selectOutput(output: OutputId) {
+    if (getOutput(output).availability !== "available") return;
+    setOutputId(output);
     setPreflightResult(null);
-    if (!packs[format] && signalId) {
-      void generatePackFor(signalId, format);
+    setStage("studio");
+    if (!packs[output] && signalId) {
+      void generatePackFor(signalId, output);
+    }
+  }
+
+  function switchOutputInStudio(output: OutputId) {
+    if (getOutput(output).availability !== "available") return;
+    setOutputId(output);
+    setPreflightResult(null);
+    if (!packs[output] && signalId) {
+      void generatePackFor(signalId, output);
     }
   }
 
   async function runPreflight() {
-    const pack = packs[activeFormat];
-    if (!pack) return;
+    const pack = packs[outputId];
+    if (!pack || !run) return;
 
-    const run = runRef.current;
+    const runId = runRef.current;
     setStage("preflight");
     setPreflightRunning(true);
     setPreflightError(null);
     try {
-      const result = await createApiClient(mode).preflight({
+      const result = await createApiClient(run.mode).preflight({
         contentPack: pack,
       });
-      if (run !== runRef.current) return;
+      if (runId !== runRef.current) return;
       setPreflightResult(result);
     } catch (error) {
-      if (run !== runRef.current) return;
+      if (runId !== runRef.current) return;
       setPreflightResult(null);
       setPreflightError(asUiError(error));
     } finally {
-      if (run === runRef.current) setPreflightRunning(false);
+      if (runId === runRef.current) setPreflightRunning(false);
     }
   }
 
-  function restart() {
+  function restart(panel: SourceOptionId | null = null) {
     runRef.current += 1;
     setStage("start");
-    setMode("live");
-    setSourceUrl("");
+    setStartPanel(panel);
+    setRun(null);
     setAnalysis(null);
     setAnalysisError(null);
     setSignalId(null);
     setPacks({});
-    setActiveFormat("short");
+    setOutputId("youtube-short");
     setGenerating(false);
     setGenerateError(null);
     setPreflightResult(null);
@@ -220,10 +280,14 @@ export function App() {
             <>
               <JourneyProgress current={STAGE_TO_JOURNEY[stage]} />
               <div className="flex items-center gap-3">
-                {mode === "demo" && analysis && (
+                {run?.mode === "demo" && analysis && (
                   <ProvenanceBadge provenance={analysis.provenance} />
                 )}
-                <Button variant="ghost" onClick={restart} className="text-sm">
+                <Button
+                  variant="ghost"
+                  onClick={() => restart()}
+                  className="text-sm"
+                >
                   Start over
                 </Button>
               </div>
@@ -235,39 +299,58 @@ export function App() {
       <main className="flex-1 px-6 py-10 sm:px-10">
         {stage === "start" && (
           <StartScreen
-            onAnalyze={(url) => void startAnalyze(url, "live")}
-            onDemo={() => void startAnalyze(DEMO_VIDEO_URL, "demo")}
+            key={startPanel ?? "default"}
+            initialPanel={startPanel}
+            onAnalyzeYoutube={analyzeYoutube}
+            onImport={analyzeImport}
+            onDemo={analyzeDemo}
           />
         )}
 
-        {stage === "analyzing" && <ProgressScreen sourceUrl={sourceUrl} />}
+        {stage === "analyzing" && run && (
+          <ProgressScreen sourceUrl={run.url} importMode={run.descriptor.mode === "import"} />
+        )}
 
         {stage === "analysis-error" && analysisError && (
           <ErrorScreen
             error={analysisError}
-            onRetry={() => void startAnalyze(sourceUrl, mode)}
-            onDemo={() => void startAnalyze(DEMO_VIDEO_URL, "demo")}
-            onRestart={restart}
+            onRetry={() => run && void startAnalyze(run)}
+            onImport={() => restart("import")}
+            onDemo={analyzeDemo}
+            onRestart={() => restart()}
           />
         )}
 
-        {stage === "signals" && analysis && (
-          <SignalsScreen analysis={analysis} onCreate={chooseSignal} />
+        {stage === "signals" && analysis && run && (
+          <SignalsScreen
+            analysis={analysis}
+            source={run.descriptor}
+            onCreate={chooseSignal}
+          />
+        )}
+
+        {stage === "destination" && selectedSignal && (
+          <DestinationScreen
+            signal={selectedSignal}
+            onSelect={selectOutput}
+            onBack={() => setStage("signals")}
+          />
         )}
 
         {stage === "studio" && selectedSignal && (
           <StudioScreen
             signal={selectedSignal}
             packs={packs}
-            activeFormat={activeFormat}
+            outputId={outputId}
             generating={generating}
             generateError={generateError}
-            onSelectFormat={selectFormat}
+            onSwitchOutput={switchOutputInStudio}
+            onChangeDestination={() => setStage("destination")}
             onRetryGenerate={() => {
-              if (signalId) void generatePackFor(signalId, activeFormat);
+              if (signalId) void generatePackFor(signalId, outputId);
             }}
-            onPackChange={(format, pack) => {
-              setPacks((previous) => ({ ...previous, [format]: pack }));
+            onPackChange={(output, pack) => {
+              setPacks((previous) => ({ ...previous, [output]: pack }));
               setPreflightResult(null);
             }}
             onBack={() => setStage("signals")}
@@ -286,18 +369,23 @@ export function App() {
           />
         )}
 
-        {stage === "export" && packs[activeFormat] && (
+        {stage === "export" && packs[outputId] && run && (
           <ExportScreen
-            pack={packs[activeFormat]}
+            pack={packs[outputId]}
+            outputId={outputId}
+            source={run.descriptor}
             onBack={() => setStage("preflight")}
-            onRestart={restart}
+            onRestart={() => restart()}
           />
         )}
       </main>
 
       <footer className="border-t border-line">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-1 px-6 py-5 text-xs text-ink-faint sm:flex-row sm:items-center sm:justify-between sm:px-10">
-          <p>NextBestContent by Tripods — from audience signals to publish-ready content.</p>
+          <p>
+            NextBestContent by Tripods — from audience signals to
+            publish-ready content.
+          </p>
           <p>No accounts · no stored audience data · synthetic demo clearly labeled</p>
         </div>
       </footer>

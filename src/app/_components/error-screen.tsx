@@ -4,11 +4,13 @@ import { Button, SectionLabel } from "@/app/_components/ui";
 export function ErrorScreen({
   error,
   onRetry,
+  onImport,
   onDemo,
   onRestart,
 }: {
   error: UiError;
   onRetry: () => void;
+  onImport: () => void;
   onDemo: () => void;
   onRestart: () => void;
 }) {
@@ -28,12 +30,17 @@ export function ErrorScreen({
 
       <div className="mt-8 flex flex-wrap items-center gap-3">
         {error.retryable && <Button onClick={onRetry}>Try again</Button>}
-        {error.offerDemo && (
+        {error.offerImport && (
           <Button
             variant={error.retryable ? "secondary" : "primary"}
-            onClick={onDemo}
+            onClick={onImport}
           >
-            Try the synthetic demo instead
+            Import comments instead
+          </Button>
+        )}
+        {error.offerDemo && (
+          <Button variant="secondary" onClick={onDemo}>
+            Try the synthetic demo
           </Button>
         )}
         <Button variant="ghost" onClick={onRestart}>

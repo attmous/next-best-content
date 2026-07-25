@@ -7,29 +7,43 @@ import {
   buildCaptionText,
   buildStoryboardMarkdown,
   copyToClipboard,
+  downloadDocumentPdf,
   downloadSlideImage,
   downloadTextFile,
 } from "@/app/_lib/exports";
 import {
-  Button,
-  ProvenanceBadge,
-  SectionLabel,
-} from "@/app/_components/ui";
+  PLATFORM_LABELS,
+  getOutput,
+  type OutputId,
+  type SourceDescriptor,
+} from "@/app/_lib/platforms";
+import { SourceReceipt } from "@/app/_components/source-receipt";
+import { Button, ProvenanceBadge, SectionLabel } from "@/app/_components/ui";
 
 export function ExportScreen({
   pack,
+  outputId,
+  source,
   onBack,
   onRestart,
 }: {
   pack: ContentPack;
+  outputId: OutputId;
+  source: SourceDescriptor;
   onBack: () => void;
   onRestart: () => void;
 }) {
+  const output = getOutput(outputId);
   const isShort = pack.format === "short";
+  const isLinkedinDocument = outputId === "linkedin-document";
+  const captionLabel = isLinkedinDocument ? "Post text" : "Caption";
+
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle",
   );
   const [downloadingSlides, setDownloadingSlides] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState(false);
   const copyResetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -58,11 +72,35 @@ export function ExportScreen({
     }
   }
 
+  async function handleDownloadPdf() {
+    setDownloadingPdf(true);
+    setPdfError(false);
+    try {
+      await downloadDocumentPdf(pack, "nextbestcontent-linkedin-document.pdf");
+    } catch {
+      setPdfError(true);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
+  const openLink = isShort
+    ? {
+        href: "https://studio.youtube.com/",
+        label: "Open YouTube Studio",
+      }
+    : output.platform === "linkedin"
+      ? { href: "https://www.linkedin.com/feed/", label: "Open LinkedIn" }
+      : null;
+
   return (
     <div className="stage-enter mx-auto flex w-full max-w-5xl flex-col gap-8">
       <section>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <SectionLabel>Export</SectionLabel>
+          <span className="rounded-full border border-line-strong px-3 py-1 text-xs font-semibold text-ink">
+            For {PLATFORM_LABELS[output.platform]} · {output.title}
+          </span>
           <ProvenanceBadge provenance={pack.provenance} />
         </div>
         <h1
@@ -75,8 +113,13 @@ export function ExportScreen({
         <p className="mt-2 text-sm text-ink-soft">
           {isShort
             ? "YouTube Short · six scenes · timed storyboard"
-            : "Carousel · six slides"}
+            : isLinkedinDocument
+              ? "LinkedIn document post · six pages"
+              : "Carousel · six slides"}
         </p>
+        <div className="mt-4">
+          <SourceReceipt source={source} provenance={pack.provenance} />
+        </div>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -119,24 +162,26 @@ export function ExportScreen({
         </section>
 
         <div className="flex flex-col gap-6">
-          {/* Caption */}
+          {/* Caption / post text */}
           <section
-            aria-label="Caption"
+            aria-label={captionLabel}
             className="rounded-3xl border border-line bg-surface p-6"
           >
             <h2 className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              Caption
+              {captionLabel}
             </h2>
             <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink">
               {buildCaptionText(pack)}
             </p>
             <div className="mt-4 flex items-center gap-3">
               <Button variant="secondary" onClick={handleCopyCaption}>
-                {copyState === "copied" ? "Copied ✓" : "Copy caption"}
+                {copyState === "copied"
+                  ? "Copied ✓"
+                  : `Copy ${captionLabel.toLowerCase()}`}
               </Button>
               <span aria-live="polite" className="text-xs text-ink-faint">
                 {copyState === "copied"
-                  ? "Caption and hashtags are on your clipboard."
+                  ? "Text and hashtags are on your clipboard."
                   : copyState === "failed"
                     ? "Clipboard was blocked — select and copy the text above."
                     : ""}
@@ -179,11 +224,29 @@ export function ExportScreen({
               Downloads
             </h2>
             <div className="mt-4 flex flex-col gap-3">
+              {isLinkedinDocument && (
+                <>
+                  <Button
+                    onClick={handleDownloadPdf}
+                    loading={downloadingPdf}
+                    loadingLabel="Building PDF…"
+                    className="justify-start"
+                  >
+                    Download document (.pdf)
+                  </Button>
+                  {pdfError && (
+                    <p role="alert" className="text-xs text-danger">
+                      The PDF couldn&rsquo;t be built in this browser — the
+                      per-page PNGs below carry the same content.
+                    </p>
+                  )}
+                </>
+              )}
               <Button
                 variant="secondary"
                 onClick={() =>
                   downloadTextFile(
-                    `nextbestcontent-${pack.format}-storyboard.md`,
+                    `nextbestcontent-${outputId}-storyboard.md`,
                     buildStoryboardMarkdown(pack),
                   )
                 }
@@ -196,45 +259,61 @@ export function ExportScreen({
                   variant="secondary"
                   onClick={handleDownloadAllSlides}
                   loading={downloadingSlides}
-                  loadingLabel="Rendering slides…"
+                  loadingLabel="Rendering images…"
                   className="justify-start"
                 >
-                  Download all 6 slides (.png)
+                  Download all 6 {isLinkedinDocument ? "pages" : "slides"}{" "}
+                  (.png)
                 </Button>
               )}
-              <div className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-ink-faint">
-                {isShort ? (
-                  <>
-                    <p className="font-medium text-ink-soft">
-                      MP4 render · not available
-                    </p>
-                    <p className="mt-0.5 text-xs leading-5">
-                      Video rendering isn&rsquo;t part of this build — the
-                      storyboard file above carries every scene, timing, and
-                      voiceover line.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="font-medium text-ink-soft">
-                      Slide PNGs are rendered locally
-                    </p>
-                    <p className="mt-0.5 text-xs leading-5">
-                      Each 1080×1350 image is drawn in your browser — nothing
-                      is uploaded anywhere.
-                    </p>
-                  </>
-                )}
-              </div>
-              <div className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-ink-faint">
-                <p className="font-medium text-ink-soft">
-                  Narration audio · not available
+              {isShort ? (
+                <div className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-ink-faint">
+                  <p className="font-medium text-ink-soft">
+                    MP4 render · not available
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5">
+                    Video rendering isn&rsquo;t part of this build — the
+                    storyboard file above carries every scene, timing, and
+                    voiceover line.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-ink-faint">
+                  <p className="font-medium text-ink-soft">
+                    Rendered locally in your browser
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5">
+                    {isLinkedinDocument
+                      ? "The PDF and page images are assembled on your machine — nothing is uploaded anywhere."
+                      : "Each 1080×1350 image is drawn in your browser — nothing is uploaded anywhere."}
+                  </p>
+                </div>
+              )}
+              {isShort && (
+                <div className="rounded-xl border border-dashed border-line px-4 py-3 text-sm text-ink-faint">
+                  <p className="font-medium text-ink-soft">
+                    Narration audio · not available
+                  </p>
+                  <p className="mt-0.5 text-xs leading-5">
+                    The ElevenLabs integration is disabled in this build. The
+                    voiceover ships as a script inside the storyboard file.
+                  </p>
+                </div>
+              )}
+              {openLink && (
+                <p className="text-xs leading-5 text-ink-faint">
+                  <a
+                    href={openLink.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-signal underline-offset-4 hover:underline"
+                  >
+                    {openLink.label} ↗
+                  </a>{" "}
+                  — a convenience link only. Nothing is published
+                  automatically; upload the downloaded assets yourself.
                 </p>
-                <p className="mt-0.5 text-xs leading-5">
-                  The ElevenLabs integration is disabled in this build. The
-                  voiceover ships as a script inside the storyboard file.
-                </p>
-              </div>
+              )}
             </div>
           </section>
         </div>
@@ -245,7 +324,7 @@ export function ExportScreen({
           ← Back to preflight
         </Button>
         <Button variant="secondary" onClick={onRestart}>
-          Analyze another video
+          Analyze another source
         </Button>
       </div>
     </div>

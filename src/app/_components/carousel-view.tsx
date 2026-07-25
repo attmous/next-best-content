@@ -5,15 +5,21 @@ import { useState } from "react";
 import type { ContentPack } from "@/contracts";
 import { InlineTextArea, InlineTextInput } from "@/app/_components/inline-edit";
 
+export type CarouselVariant = "generic" | "linkedin-document";
+
 /**
- * Six-slide carousel with keyboard-navigable slide stepping and lean inline
- * editing of the on-slide copy.
+ * Six-slide carousel with keyboard-navigable stepping and lean inline
+ * editing of the on-slide copy. The LinkedIn variant presents the same
+ * six scenes as a document-post preview (pages instead of slides, post
+ * text instead of caption).
  */
 export function CarouselView({
   pack,
+  variant = "generic",
   onSceneChange,
 }: {
   pack: ContentPack;
+  variant?: CarouselVariant;
   onSceneChange: (
     sceneIndex: number,
     field: "headline" | "body",
@@ -22,15 +28,22 @@ export function CarouselView({
 }) {
   const [current, setCurrent] = useState(0);
   const scene = pack.scenes[current];
+  const isLinkedin = variant === "linkedin-document";
+  const unit = isLinkedin ? "Page" : "Slide";
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row">
       <div className="mx-auto w-full max-w-[340px] shrink-0 lg:mx-0">
         {/* Slide (4:5) */}
+        {isLinkedin && (
+          <p className="mb-2 rounded-lg bg-surface-raised px-3 py-1.5 text-[11px] uppercase tracking-wide text-ink-faint">
+            LinkedIn document post preview · PDF pages
+          </p>
+        )}
         <div
           role="group"
-          aria-roledescription="slide"
-          aria-label={`Slide ${current + 1} of ${pack.scenes.length}`}
+          aria-roledescription={unit.toLowerCase()}
+          aria-label={`${unit} ${current + 1} of ${pack.scenes.length}`}
           className="relative flex aspect-[4/5] flex-col overflow-hidden rounded-3xl border border-line-strong bg-[#12130f] p-7 shadow-2xl shadow-black/40"
         >
           <span
@@ -38,13 +51,13 @@ export function CarouselView({
             className="mb-5 block h-1.5 w-16 rounded-full bg-signal"
           />
           <InlineTextInput
-            label={`Slide ${current + 1} headline`}
+            label={`${unit} ${current + 1} headline`}
             value={scene.headline}
             onChange={(value) => onSceneChange(current, "headline", value)}
             className="font-display text-2xl font-bold leading-tight text-white"
           />
           <InlineTextArea
-            label={`Slide ${current + 1} body`}
+            label={`${unit} ${current + 1} body`}
             value={scene.body}
             onChange={(value) => onSceneChange(current, "body", value)}
             className="mt-3 flex-1 text-sm leading-6 text-white/85"
@@ -68,13 +81,13 @@ export function CarouselView({
           >
             ← Previous
           </button>
-          <ol className="flex gap-1.5" aria-label="Slides">
+          <ol className="flex gap-1.5" aria-label={`${unit}s`}>
             {pack.scenes.map((item, index) => (
               <li key={item.index}>
                 <button
                   type="button"
                   onClick={() => setCurrent(index)}
-                  aria-label={`Go to slide ${index + 1}`}
+                  aria-label={`Go to ${unit.toLowerCase()} ${index + 1}`}
                   aria-current={index === current ? "true" : undefined}
                   className={`block size-2.5 rounded-full transition-colors ${
                     index === current
@@ -97,7 +110,8 @@ export function CarouselView({
           </button>
         </div>
         <p className="mt-2 text-xs text-ink-faint">
-          Headline and body are editable directly on the slide.
+          Headline and body are editable directly on the{" "}
+          {unit.toLowerCase()}.
         </p>
       </div>
 
@@ -106,7 +120,7 @@ export function CarouselView({
         <div className="flex flex-col gap-4 rounded-2xl border border-line bg-surface p-5">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              Visual direction · slide {current + 1}
+              Visual direction · {unit.toLowerCase()} {current + 1}
             </p>
             <p className="mt-1 text-sm leading-6 text-ink-soft">
               {scene.visualDirection}
@@ -114,7 +128,7 @@ export function CarouselView({
           </div>
           <div className="border-t border-line pt-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              Caption
+              {isLinkedin ? "Post text" : "Caption"}
             </p>
             <p className="mt-1 text-sm leading-6 text-ink">{pack.caption}</p>
           </div>
