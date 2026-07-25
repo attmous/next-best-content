@@ -28,6 +28,8 @@ configuration and policy-approval gates.
 - A registry-driven source and destination picker: YouTube and creator imports
   on the source side; YouTube Shorts and LinkedIn document posts on the output
   side.
+- Accessible, self-contained inline SVG icons for platforms, actions, statuses,
+  and warnings, paired with visible text labels and no remote icon dependency.
 - An explicit, clearly labeled synthetic demo with exactly three audience
   signals and six-scene Short or six-slide carousel drafts.
 - Client-side JSON, CSV, and pasted-text comment import preparation with
@@ -54,8 +56,11 @@ rendering remain optional future work.
 
 ## Source modes
 
-All outputs will carry provenance. Synthetic data must be visibly identified
-and must never silently replace creator-provided or live data.
+All analysis results carry explicit provenance, with live and imported sources
+established by the server. Synthetic data is visibly identified and never
+silently replaces creator-provided or live data. Until the stateless
+analysis-to-generation handoff is signed, the public generation route
+deliberately marks output provenance as unknown.
 
 | Source | MVP intent | Status |
 | --- | --- | --- |
@@ -73,7 +78,7 @@ also required. This project does not use yt-dlp or scrape YouTube.
 
 ## Destinations
 
-Source and destination are independent: for example, a future LinkedIn-tagged
+Source and destination are independent: for example, a LinkedIn-tagged
 import can produce a YouTube Short, while a YouTube-derived signal can produce
 a LinkedIn document.
 
