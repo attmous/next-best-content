@@ -10,6 +10,7 @@ import {
   type OutputId,
 } from "@/app/_lib/platforms";
 import { CarouselView } from "@/app/_components/carousel-view";
+import { PlatformIcon } from "@/app/_components/icons";
 import { InlineTextArea } from "@/app/_components/inline-edit";
 import { ShortPreview } from "@/app/_components/short-preview";
 import {
@@ -69,7 +70,11 @@ export function StudioScreen({
       <section>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <SectionLabel>Content studio</SectionLabel>
-          <span className="rounded-full border border-line-strong px-3 py-1 text-xs font-semibold text-ink">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1 text-xs font-semibold text-ink">
+            <PlatformIcon
+              platform={output.platform}
+              className="size-3.5 text-ink-soft"
+            />
             For {PLATFORM_LABELS[output.platform]} · {output.title}
           </span>
           {pack && <ProvenanceBadge provenance={pack.provenance} />}
@@ -103,12 +108,16 @@ export function StudioScreen({
                   onClick={() => onSwitchOutput(candidate.id)}
                   aria-pressed={isActive}
                   disabled={generating}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
+                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
                     isActive
                       ? "bg-signal text-signal-ink"
                       : "text-ink-soft hover:text-ink"
                   }`}
                 >
+                  <PlatformIcon
+                    platform={candidate.platform}
+                    className="size-4"
+                  />
                   {candidate.title.startsWith(
                     PLATFORM_LABELS[candidate.platform],
                   )

@@ -17,6 +17,14 @@ import {
   type OutputId,
   type SourceDescriptor,
 } from "@/app/_lib/platforms";
+import {
+  CopyIcon,
+  ExternalLinkIcon,
+  FilePdfIcon,
+  FileTextIcon,
+  ImageIcon,
+  PlatformIcon,
+} from "@/app/_components/icons";
 import { SourceReceipt } from "@/app/_components/source-receipt";
 import { Button, ProvenanceBadge, SectionLabel } from "@/app/_components/ui";
 
@@ -98,7 +106,11 @@ export function ExportScreen({
       <section>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <SectionLabel>Export</SectionLabel>
-          <span className="rounded-full border border-line-strong px-3 py-1 text-xs font-semibold text-ink">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line-strong px-3 py-1 text-xs font-semibold text-ink">
+            <PlatformIcon
+              platform={output.platform}
+              className="size-3.5 text-ink-soft"
+            />
             For {PLATFORM_LABELS[output.platform]} · {output.title}
           </span>
           <ProvenanceBadge provenance={pack.provenance} />
@@ -175,6 +187,7 @@ export function ExportScreen({
             </p>
             <div className="mt-4 flex items-center gap-3">
               <Button variant="secondary" onClick={handleCopyCaption}>
+                <CopyIcon className="size-4" />
                 {copyState === "copied"
                   ? "Copied ✓"
                   : `Copy ${captionLabel.toLowerCase()}`}
@@ -232,6 +245,7 @@ export function ExportScreen({
                     loadingLabel="Building PDF…"
                     className="justify-start"
                   >
+                    <FilePdfIcon className="size-4" />
                     Download document (.pdf)
                   </Button>
                   {pdfError && (
@@ -252,6 +266,7 @@ export function ExportScreen({
                 }
                 className="justify-start"
               >
+                <FileTextIcon className="size-4" />
                 Download storyboard (.md)
               </Button>
               {!isShort && (
@@ -262,6 +277,7 @@ export function ExportScreen({
                   loadingLabel="Rendering images…"
                   className="justify-start"
                 >
+                  <ImageIcon className="size-4" />
                   Download all 6 {isLinkedinDocument ? "pages" : "slides"}{" "}
                   (.png)
                 </Button>
@@ -306,9 +322,10 @@ export function ExportScreen({
                     href={openLink.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-signal underline-offset-4 hover:underline"
+                    className="inline-flex items-center gap-1 font-medium text-signal underline-offset-4 hover:underline"
                   >
-                    {openLink.label} ↗
+                    <ExternalLinkIcon className="size-3.5" />
+                    {openLink.label}
                   </a>{" "}
                   — a convenience link only. Nothing is published
                   automatically; upload the downloaded assets yourself.

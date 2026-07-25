@@ -4,6 +4,7 @@ import {
   SOURCE_TAG_LABELS,
   type SourceDescriptor,
 } from "@/app/_lib/platforms";
+import { PlatformIcon, SourceModeIcon } from "@/app/_components/icons";
 import { ProvenanceBadge } from "@/app/_components/ui";
 
 /**
@@ -24,14 +25,19 @@ export function SourceReceipt({
       className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-xl border border-line bg-surface-raised px-4 py-2.5 text-xs text-ink-soft"
     >
       <div className="flex items-center gap-1.5">
-        <dt className="uppercase tracking-wide text-ink-faint">Source</dt>
-        <dd className="font-medium text-ink">
+        <dt className="sr-only">Source platform</dt>
+        <dd className="flex items-center gap-1.5 font-medium text-ink">
+          <PlatformIcon
+            platform={source.platform}
+            className="size-3.5 text-ink-soft"
+          />
           {SOURCE_TAG_LABELS[source.platform]}
         </dd>
       </div>
       <div className="flex items-center gap-1.5">
-        <dt className="uppercase tracking-wide text-ink-faint">Mode</dt>
-        <dd className="font-medium text-ink">
+        <dt className="sr-only">Source mode</dt>
+        <dd className="flex items-center gap-1.5 font-medium text-ink">
+          <SourceModeIcon mode={source.mode} className="size-3.5 text-ink-soft" />
           {SOURCE_MODE_LABELS[source.mode]}
         </dd>
       </div>

@@ -13,7 +13,22 @@ import {
   ImportForm,
   type ImportSubmission,
 } from "@/app/_components/import-form";
+import {
+  FlaskIcon,
+  ImportTrayIcon,
+  LockIcon,
+  PlatformIcon,
+} from "@/app/_components/icons";
 import { Button } from "@/app/_components/ui";
+
+function OptionGlyph({ option }: { option: SourceOption }) {
+  const className = "size-5";
+  if (option.id === "import") return <ImportTrayIcon className={className} />;
+  if (option.mode === "demo") return <FlaskIcon className={className} />;
+  return (
+    <PlatformIcon platform={option.platform ?? "other"} className={className} />
+  );
+}
 
 const URL_ERROR_COPY: Record<string, string> = {
   empty: "Paste a YouTube video URL to get started.",
@@ -116,26 +131,39 @@ export function SourcePicker({
                 onClick={() => setOpenId(isOpen ? null : option.id)}
                 className="flex w-full items-start justify-between gap-4 rounded-2xl px-5 py-4 text-left"
               >
-                <span>
-                  <span className="flex flex-wrap items-center gap-2">
-                    <span className="font-semibold text-ink">
-                      {option.title}
-                    </span>
-                    {isGated && (
-                      <span className="rounded-full border border-warn/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warn">
-                        {option.id === "linkedin-live"
-                          ? "Requires LinkedIn approval"
-                          : "Gate-dependent"}
-                      </span>
-                    )}
-                    {option.mode === "demo" && (
-                      <span className="rounded-full border border-signal/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-signal">
-                        Synthetic
-                      </span>
-                    )}
+                <span className="flex min-w-0 items-start gap-3.5">
+                  <span
+                    aria-hidden="true"
+                    className={`mt-0.5 grid size-10 shrink-0 place-items-center rounded-xl ${
+                      isOpen
+                        ? "bg-signal text-signal-ink"
+                        : "bg-surface-raised text-ink-soft"
+                    }`}
+                  >
+                    <OptionGlyph option={option} />
                   </span>
-                  <span className="mt-1 block text-sm leading-5.5 text-ink-soft">
-                    {option.description}
+                  <span className="min-w-0">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink">
+                        {option.title}
+                      </span>
+                      {isGated && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-warn/50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warn">
+                          <LockIcon className="size-3" />
+                          {option.id === "linkedin-live"
+                            ? "Requires approval"
+                            : "Gate-dependent"}
+                        </span>
+                      )}
+                      {option.mode === "demo" && (
+                        <span className="rounded-full border border-signal/40 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-signal">
+                          Synthetic
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-1 block text-sm leading-5.5 text-ink-soft">
+                      {option.description}
+                    </span>
                   </span>
                 </span>
                 <span

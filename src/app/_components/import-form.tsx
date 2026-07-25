@@ -12,6 +12,7 @@ import {
   SOURCE_TAG_LABELS,
   type SourcePlatformTag,
 } from "@/app/_lib/platforms";
+import { PlatformIcon } from "@/app/_components/icons";
 import { Button } from "@/app/_components/ui";
 
 export interface ImportSubmission {
@@ -134,12 +135,13 @@ export function ImportForm({
               role="radio"
               aria-checked={platform === tag}
               onClick={() => setPlatform(tag)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                 platform === tag
                   ? "bg-signal text-signal-ink"
                   : "bg-surface-raised text-ink-soft hover:text-ink"
               }`}
             >
+              <PlatformIcon platform={tag} className="size-3.5" />
               {SOURCE_TAG_LABELS[tag]}
             </button>
           ))}

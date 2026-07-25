@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import type { ContentPack } from "@/contracts";
 import { InlineTextArea, InlineTextInput } from "@/app/_components/inline-edit";
+import { PauseIcon, PlayIcon } from "@/app/_components/icons";
 import { Button } from "@/app/_components/ui";
 
 function subscribeToReducedMotion(onChange: () => void): () => void {
@@ -112,6 +113,11 @@ export function ShortPreview({
             aria-label={playing ? "Pause storyboard" : "Play timed storyboard"}
             className="flex-1"
           >
+            {playing ? (
+              <PauseIcon className="size-4" />
+            ) : (
+              <PlayIcon className="size-4" />
+            )}
             {playing ? "Pause" : "Play storyboard"}
           </Button>
           <span className="text-xs text-ink-faint">{Math.round(totalSeconds)}s total</span>
@@ -192,10 +198,9 @@ export function ShortPreview({
             </p>
           </div>
           <p className="border-t border-line pt-3 text-xs leading-5 text-ink-faint">
-            Narration audio isn&rsquo;t available in this build (the ElevenLabs
-            integration is disabled), so the voiceover ships as a script. MP4
-            rendering is also out of scope — the timed storyboard above is the
-            preview.
+            Narration audio and MP4 rendering aren&rsquo;t available in this
+            build — the voiceover ships as a script and the timed storyboard is
+            the preview.
           </p>
         </div>
       </div>

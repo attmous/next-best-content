@@ -6,6 +6,7 @@ import type {
   PreflightResponse,
 } from "@/contracts";
 import type { UiError } from "@/app/_lib/errors";
+import { AlertIcon, CheckIcon, CrossIcon } from "@/app/_components/icons";
 import { Button, SectionLabel, Spinner } from "@/app/_components/ui";
 
 const CHECK_LABELS: Record<PreflightCheckName, string> = {
@@ -186,19 +187,19 @@ function CheckRow({
 }) {
   const status =
     check.status === "pass"
-      ? { icon: "✓", className: "text-ok", label: "Passed" }
+      ? { Icon: CheckIcon, className: "text-ok", label: "Passed" }
       : check.status === "warning"
-        ? { icon: "!", className: "text-warn", label: "Warning" }
-        : { icon: "✕", className: "text-danger", label: "Failed" };
+        ? { Icon: AlertIcon, className: "text-warn", label: "Warning" }
+        : { Icon: CrossIcon, className: "text-danger", label: "Failed" };
 
   return (
     <li className="rounded-2xl border border-line bg-surface p-5">
       <div className="flex items-start gap-4">
         <span
           aria-hidden="true"
-          className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border border-current text-sm font-bold ${status.className}`}
+          className={`mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border border-current ${status.className}`}
         >
-          {status.icon}
+          <status.Icon className="size-4" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
