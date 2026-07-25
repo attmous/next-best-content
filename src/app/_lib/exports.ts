@@ -5,6 +5,7 @@
  * module pretends to render MP4s or narration.
  */
 import type { ContentPack } from "@/contracts";
+import { buildPdfFromJpegPages, type JpegPage } from "@/app/_lib/pdf";
 
 export function buildCaptionText(pack: ContentPack): string {
   const hashtags = pack.hashtags.join(" ");
@@ -132,16 +133,16 @@ function drawWrapped(
 }
 
 /**
- * Draws one carousel slide (1080×1350) onto a canvas and resolves with a PNG
- * blob. Pure canvas drawing — no external assets, so the canvas never taints.
+ * Draws one carousel slide/page (1080×1350) onto a fresh canvas. Pure canvas
+ * drawing — no external assets, so the canvas never taints.
  */
-export function renderSlideImage(
+function drawSlideCanvas(
   pack: ContentPack,
   sceneIndex: number,
-): Promise<Blob> {
+): HTMLCanvasElement {
   const scene = pack.scenes[sceneIndex];
   if (!scene) {
-    return Promise.reject(new Error(`No scene at index ${sceneIndex}`));
+    throw new Error(`No scene at index ${sceneIndex}`);
   }
 
   const canvas = document.createElement("canvas");
@@ -149,7 +150,7 @@ export function renderSlideImage(
   canvas.height = SLIDE_HEIGHT;
   const context = canvas.getContext("2d");
   if (!context) {
-    return Promise.reject(new Error("Canvas 2D is unavailable"));
+    throw new Error("Canvas 2D is unavailable");
   }
 
   // Background
@@ -196,15 +197,69 @@ export function renderSlideImage(
     context.fillText("Synthetic demo content", 96, SLIDE_HEIGHT - 100);
   }
 
+  return canvas;
+}
+
+function canvasToBlob(canvas: HTMLCanvasElement, type: string): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (blob) {
-        resolve(blob);
-      } else {
-        reject(new Error("Canvas export failed"));
-      }
-    }, "image/png");
+    canvas.toBlob(
+      (blob) => {
+        if (blob) {
+          resolve(blob);
+        } else {
+          reject(new Error("Canvas export failed"));
+        }
+      },
+      type,
+      type === "image/jpeg" ? 0.92 : undefined,
+    );
   });
+}
+
+export function renderSlideImage(
+  pack: ContentPack,
+  sceneIndex: number,
+): Promise<Blob> {
+  try {
+    return canvasToBlob(drawSlideCanvas(pack, sceneIndex), "image/png");
+  } catch (error) {
+    return Promise.reject(error);
+  }
+}
+
+/** Renders one slide as a JPEG page for the PDF document export. */
+export async function renderSlideJpegPage(
+  pack: ContentPack,
+  sceneIndex: number,
+): Promise<JpegPage> {
+  const blob = await canvasToBlob(
+    drawSlideCanvas(pack, sceneIndex),
+    "image/jpeg",
+  );
+  return {
+    data: new Uint8Array(await blob.arrayBuffer()),
+    width: SLIDE_WIDTH,
+    height: SLIDE_HEIGHT,
+  };
+}
+
+/**
+ * Builds a real multi-page PDF (one page per slide) locally and downloads
+ * it — the artifact LinkedIn expects for a document post.
+ */
+export async function downloadDocumentPdf(
+  pack: ContentPack,
+  filename: string,
+): Promise<void> {
+  const pages: JpegPage[] = [];
+  for (let index = 0; index < pack.scenes.length; index += 1) {
+    pages.push(await renderSlideJpegPage(pack, index));
+  }
+  const bytes = buildPdfFromJpegPages(pages);
+  const arrayBuffer = new ArrayBuffer(bytes.length);
+  new Uint8Array(arrayBuffer).set(bytes);
+  const blob = new Blob([arrayBuffer], { type: "application/pdf" });
+  triggerDownload(URL.createObjectURL(blob), filename, true);
 }
 
 export async function downloadSlideImage(

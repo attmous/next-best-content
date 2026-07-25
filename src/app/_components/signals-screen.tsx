@@ -3,6 +3,8 @@
 import { useState } from "react";
 
 import type { AnalyzeResponse, Signal } from "@/contracts";
+import type { SourceDescriptor } from "@/app/_lib/platforms";
+import { SourceReceipt } from "@/app/_components/source-receipt";
 import {
   Button,
   CategoryBadge,
@@ -13,9 +15,11 @@ import {
 
 export function SignalsScreen({
   analysis,
+  source,
   onCreate,
 }: {
   analysis: AnalyzeResponse;
+  source: SourceDescriptor;
   onCreate: (signalId: string) => void;
 }) {
   const { video, signals, provenance } = analysis;
@@ -55,6 +59,10 @@ export function SignalsScreen({
               <ProvenanceBadge provenance={provenance} />
             </div>
           </div>
+        </div>
+
+        <div className="mt-3">
+          <SourceReceipt source={source} provenance={provenance} />
         </div>
       </section>
 

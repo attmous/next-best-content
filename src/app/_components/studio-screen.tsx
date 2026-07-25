@@ -1,7 +1,14 @@
 "use client";
 
-import type { ContentFormat, ContentPack, Signal } from "@/contracts";
+import type { ContentPack, Signal } from "@/contracts";
 import type { UiError } from "@/app/_lib/errors";
+import {
+  PLATFORM_LABELS,
+  availableOutputs,
+  getOutput,
+  recommendedOutputFor,
+  type OutputId,
+} from "@/app/_lib/platforms";
 import { CarouselView } from "@/app/_components/carousel-view";
 import { InlineTextArea } from "@/app/_components/inline-edit";
 import { ShortPreview } from "@/app/_components/short-preview";
@@ -12,35 +19,36 @@ import {
   Spinner,
 } from "@/app/_components/ui";
 
-const FORMAT_LABELS: Record<ContentFormat, string> = {
-  short: "YouTube Short",
-  carousel: "Carousel",
-};
-
 export function StudioScreen({
   signal,
   packs,
-  activeFormat,
+  outputId,
   generating,
   generateError,
-  onSelectFormat,
+  onSwitchOutput,
+  onChangeDestination,
   onRetryGenerate,
   onPackChange,
   onBack,
   onPreflight,
 }: {
   signal: Signal;
-  packs: Partial<Record<ContentFormat, ContentPack>>;
-  activeFormat: ContentFormat;
+  packs: Partial<Record<OutputId, ContentPack>>;
+  outputId: OutputId;
   generating: boolean;
   generateError: UiError | null;
-  onSelectFormat: (format: ContentFormat) => void;
+  onSwitchOutput: (outputId: OutputId) => void;
+  onChangeDestination: () => void;
   onRetryGenerate: () => void;
-  onPackChange: (format: ContentFormat, pack: ContentPack) => void;
+  onPackChange: (outputId: OutputId, pack: ContentPack) => void;
   onBack: () => void;
   onPreflight: () => void;
 }) {
-  const pack = packs[activeFormat];
+  const output = getOutput(outputId);
+  const pack = packs[outputId];
+  const recommendedId = recommendedOutputFor(
+    signal.recommendation.suggestedFormat,
+  );
 
   function updateScene(
     sceneIndex: number,
@@ -48,7 +56,7 @@ export function StudioScreen({
     value: string,
   ) {
     if (!pack) return;
-    onPackChange(activeFormat, {
+    onPackChange(outputId, {
       ...pack,
       scenes: pack.scenes.map((scene, index) =>
         index === sceneIndex ? { ...scene, [field]: value } : scene,
@@ -61,6 +69,9 @@ export function StudioScreen({
       <section>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <SectionLabel>Content studio</SectionLabel>
+          <span className="rounded-full border border-line-strong px-3 py-1 text-xs font-semibold text-ink">
+            For {PLATFORM_LABELS[output.platform]} · {output.title}
+          </span>
           {pack && <ProvenanceBadge provenance={pack.provenance} />}
         </div>
         <h1
@@ -71,44 +82,52 @@ export function StudioScreen({
           {pack?.title ?? signal.recommendation.workingTitle}
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-          Built from the signal “{signal.title}” —{" "}
-          {signal.evidenceCount} supporting comments travel with this draft.
+          Built from the signal “{signal.title}” — {signal.evidenceCount}{" "}
+          supporting comments travel with this draft.
         </p>
       </section>
 
       <fieldset>
         <legend className="text-xs font-semibold uppercase tracking-wide text-ink-faint">
-          Format
+          Destination
         </legend>
-        <div className="mt-2 inline-flex rounded-xl border border-line bg-surface p-1">
-          {(Object.keys(FORMAT_LABELS) as ContentFormat[]).map((format) => {
-            const isActive = format === activeFormat;
-            const isRecommended =
-              format === signal.recommendation.suggestedFormat;
-            return (
-              <button
-                key={format}
-                type="button"
-                onClick={() => onSelectFormat(format)}
-                aria-pressed={isActive}
-                disabled={generating}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
-                  isActive
-                    ? "bg-signal text-signal-ink"
-                    : "text-ink-soft hover:text-ink"
-                }`}
-              >
-                {FORMAT_LABELS[format]}
-                {isRecommended && (
-                  <span
-                    className={`ml-2 text-[10px] uppercase tracking-wide ${isActive ? "text-signal-ink/70" : "text-signal"}`}
-                  >
-                    Recommended
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <div className="inline-flex rounded-xl border border-line bg-surface p-1">
+            {availableOutputs().map((candidate) => {
+              const isActive = candidate.id === outputId;
+              const isRecommended = candidate.id === recommendedId;
+              return (
+                <button
+                  key={candidate.id}
+                  type="button"
+                  onClick={() => onSwitchOutput(candidate.id)}
+                  aria-pressed={isActive}
+                  disabled={generating}
+                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
+                    isActive
+                      ? "bg-signal text-signal-ink"
+                      : "text-ink-soft hover:text-ink"
+                  }`}
+                >
+                  {candidate.title.startsWith(
+                    PLATFORM_LABELS[candidate.platform],
+                  )
+                    ? candidate.title
+                    : `${PLATFORM_LABELS[candidate.platform]} ${candidate.title}`}
+                  {isRecommended && (
+                    <span
+                      className={`ml-2 text-[10px] uppercase tracking-wide ${isActive ? "text-signal-ink/70" : "text-signal"}`}
+                    >
+                      Recommended
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <Button variant="ghost" onClick={onChangeDestination}>
+            All destinations…
+          </Button>
         </div>
       </fieldset>
 
@@ -119,8 +138,9 @@ export function StudioScreen({
         >
           <Spinner />
           <span>
-            Drafting six {activeFormat === "short" ? "scenes" : "slides"} from
-            the audience signal…
+            Drafting six{" "}
+            {output.contractFormat === "short" ? "scenes" : "pages"} from the
+            audience signal…
           </span>
         </div>
       )}
@@ -150,13 +170,17 @@ export function StudioScreen({
           <section aria-label="Hook">
             <div className="rounded-2xl border border-line bg-surface p-5">
               <p className="text-xs font-semibold uppercase tracking-wide text-signal">
-                Hook · the first two seconds · editable
+                Hook ·{" "}
+                {output.contractFormat === "short"
+                  ? "the first two seconds"
+                  : "the opening line"}{" "}
+                · editable
               </p>
               <InlineTextArea
                 label="Hook"
                 value={pack.hook}
                 onChange={(value) =>
-                  onPackChange(activeFormat, { ...pack, hook: value })
+                  onPackChange(outputId, { ...pack, hook: value })
                 }
                 className="mt-1 font-display text-lg leading-6.5 text-ink"
                 rows={2}
@@ -165,10 +189,16 @@ export function StudioScreen({
           </section>
 
           <section aria-label="Preview and scenes">
-            {activeFormat === "short" ? (
+            {output.contractFormat === "short" ? (
               <ShortPreview pack={pack} onSceneChange={updateScene} />
             ) : (
-              <CarouselView pack={pack} onSceneChange={updateScene} />
+              <CarouselView
+                pack={pack}
+                variant={
+                  output.platform === "linkedin" ? "linkedin-document" : "generic"
+                }
+                onSceneChange={updateScene}
+              />
             )}
           </section>
         </>

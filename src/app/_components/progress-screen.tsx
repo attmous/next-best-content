@@ -30,7 +30,13 @@ const STEP_INTERVAL_MS = 620;
  * no percentage: the steps describe real stages of the pipeline and the last
  * step stays active until the request actually resolves.
  */
-export function ProgressScreen({ sourceUrl }: { sourceUrl: string }) {
+export function ProgressScreen({
+  sourceUrl,
+  importMode = false,
+}: {
+  sourceUrl: string;
+  importMode?: boolean;
+}) {
   const [activeStep, setActiveStep] = useState(0);
 
   useEffect(() => {
@@ -57,7 +63,16 @@ export function ProgressScreen({ sourceUrl }: { sourceUrl: string }) {
       <p className="mt-2 truncate text-sm text-ink-faint">{sourceUrl}</p>
 
       <ol className="mt-10 flex flex-col gap-1" aria-label="Analysis steps">
-        {ANALYSIS_STEPS.map((step, index) => {
+        {(importMode
+          ? [
+              {
+                title: "Reading your imported comments",
+                detail: "Validating the creator-supplied comment set",
+              },
+              ...ANALYSIS_STEPS.slice(1),
+            ]
+          : ANALYSIS_STEPS
+        ).map((step, index) => {
           const state =
             index < activeStep
               ? "done"
