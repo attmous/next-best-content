@@ -94,7 +94,7 @@ const ERROR_COPY: Record<UiErrorCode, ErrorCopy> = {
   FEATURE_DISABLED: {
     title: "Live access is disabled for this environment",
     description:
-      "The required integration is switched off here — live YouTube analysis needs both API and policy gates enabled. Importing comments works without any gates.",
+      "The required integration is switched off here — live YouTube analysis needs both API and policy gates enabled. Importing comments avoids those platform gates, but still needs the analysis backend.",
     retryable: false,
     offerDemo: true,
     offerImport: true,
@@ -105,7 +105,7 @@ const ERROR_COPY: Record<UiErrorCode, ErrorCopy> = {
       "This build's backend routes are still under construction, so live analysis can't run. The synthetic demo walks the identical journey with clearly labeled fictional data.",
     retryable: false,
     offerDemo: true,
-    offerImport: true,
+    offerImport: false,
   },
   INTERNAL_ERROR: {
     title: "Something broke on our side",

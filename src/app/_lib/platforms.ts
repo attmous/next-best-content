@@ -61,7 +61,7 @@ export const SOURCE_OPTIONS: SourceOption[] = [
     description:
       "Paste a video URL and analyze its live comment section through the YouTube Data API.",
     unavailableReason:
-      "Live YouTube access runs only when this environment's API and policy gates are both enabled. You can still submit — if the gates are off you'll get a clear error, never substituted data. Importing comments always works.",
+      "Live YouTube access runs only when this environment's API and policy gates are both enabled. You can still submit — if the gates are off you'll get a clear error, never substituted data. Importing comments avoids the YouTube gates but still needs the analysis backend.",
   },
   {
     id: "import",
@@ -70,7 +70,7 @@ export const SOURCE_OPTIONS: SourceOption[] = [
     availability: "available",
     title: "Import comments",
     description:
-      "Bring up to 100 comments you have the right to use — exported from YouTube, LinkedIn, or anywhere else — as JSON, CSV, or pasted text.",
+      "Prepare up to 100 comments you have the right to use — exported from YouTube, LinkedIn, or anywhere else — as JSON, CSV, or pasted text. Analysis still depends on this environment's backend.",
   },
   {
     id: "demo",
