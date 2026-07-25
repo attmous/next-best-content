@@ -12,6 +12,7 @@ const VIDEO_URL = `https://www.youtube.com/watch?v=${VIDEO_ID}`;
 const API_KEY = "youtube-secret-key";
 
 const ENABLED_ENVIRONMENT: YoutubeSourceEnvironment = {
+  APP_PROFILE: "self_hosted",
   ENABLE_YOUTUBE_API: "true",
   YOUTUBE_POLICY_APPROVED: "true",
   YOUTUBE_API_KEY: API_KEY,
@@ -158,16 +159,19 @@ function getCommentsOptions(
 describe("createYoutubeCommentSource", () => {
   it.each([
     {
+      APP_PROFILE: "self_hosted",
       ENABLE_YOUTUBE_API: "false",
       YOUTUBE_POLICY_APPROVED: "true",
       YOUTUBE_API_KEY: API_KEY,
     },
     {
+      APP_PROFILE: "self_hosted",
       ENABLE_YOUTUBE_API: "true",
       YOUTUBE_POLICY_APPROVED: "false",
       YOUTUBE_API_KEY: API_KEY,
     },
     {
+      APP_PROFILE: "self_hosted",
       ENABLE_YOUTUBE_API: "true",
       YOUTUBE_POLICY_APPROVED: "true",
       YOUTUBE_API_KEY: "   ",
@@ -191,6 +195,35 @@ describe("createYoutubeCommentSource", () => {
       expect(fetch).not.toHaveBeenCalled();
     },
   );
+
+  it("ignores a fully configured YouTube credential in the public profile", async () => {
+    const fetch = vi.fn<FetchLike>();
+    const source = createYoutubeCommentSource({
+      environment: {
+        APP_PROFILE: "public_demo",
+        ENABLE_YOUTUBE_API: "true",
+        YOUTUBE_POLICY_APPROVED: "true",
+        YOUTUBE_API_KEY: API_KEY,
+      },
+      fetch,
+    });
+
+    let thrown: unknown;
+    try {
+      await source.getComments(VIDEO_URL, getCommentsOptions());
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(YoutubeSourceError);
+    expect(thrown).toMatchObject({
+      kind: "feature_disabled",
+      message: "YouTube access is disabled.",
+      retryable: false,
+    });
+    expect(String(thrown)).not.toContain(API_KEY);
+    expect(fetch).not.toHaveBeenCalled();
+  });
 
   it("fetches public metadata and published top-level comments", async () => {
     const fake = sequenceFetch([

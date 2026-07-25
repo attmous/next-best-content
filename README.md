@@ -10,17 +10,33 @@ and run a transparent preflight check.
 
 ## Current status
 
-The repository contains a credential-free synthetic journey plus a
-schema-validated live backend. Operators can enable model-backed creator
-imports immediately, while live YouTube reading remains behind separate
-configuration and policy-approval gates.
+The repository has two explicit server-owned application profiles. The public
+deployment is a credential-free synthetic journey; private self-hosted
+installations may enable the schema-validated live backend. Live YouTube
+reading remains behind separate configuration and policy-approval gates.
+
+| Profile | Intended installation | Server behavior |
+| --- | --- | --- |
+| `public_demo` | Public Vercel demo | Synthetic client journey only; direct analyze/generate calls fail with typed `FEATURE_DISABLED` errors |
+| `self_hosted` | Private local Docker runtime | Creator imports, model-backed workflows, and policy-approved live sources follow explicit capability flags |
+
+`APP_PROFILE` is never inferred from Vercel, Docker, a hostname, or a request.
+Missing or unknown values resolve to the fail-closed `public_demo` behavior.
+`APP_INSTALLATION=public|private` is a separate, explicit advisory fact for the
+UI and health diagnostics; it does not provide authentication, firewalling, or
+network access control.
+
+The public deployment must set `APP_PROFILE=public_demo` and
+`APP_INSTALLATION=public`. A local Docker runtime should set
+`APP_PROFILE=self_hosted` and `APP_INSTALLATION=private`.
 
 | Route | Responsibility | Current behavior |
 | --- | --- | --- |
-| `POST /api/analyze` | Normalize creator-owned imports or a gated YouTube source and return exactly three evidence-backed signals | Implemented with OpenAI structured output |
-| `POST /api/generate` | Turn one signal into a six-scene YouTube Short or six-page LinkedIn document draft | Implemented with OpenAI structured output |
+| `POST /api/analyze` | Normalize creator-owned imports or a gated YouTube source and return exactly three evidence-backed signals | Self-hosted only; typed `FEATURE_DISABLED` in public demo |
+| `POST /api/generate` | Turn one signal into a six-scene YouTube Short or six-page LinkedIn document draft | Self-hosted only; typed `FEATURE_DISABLED` in public demo |
 | `POST /api/preflight` | Apply deterministic quality and safety checks to a content pack | Implemented with typed `200`, `400`, `413`, and `500` responses |
-| `GET /api/capabilities` | Tell the UI which integrations and outputs are actually available | Implemented from server-side configuration and policy gates |
+| `GET /api/capabilities` | Tell the UI the active profile and which workflows/targets are actually available | Public, non-secret capability facts only |
+| `GET /api/health` | Verify the server has a valid production profile configuration | No external calls or credential details |
 
 ### What works now
 
@@ -34,8 +50,8 @@ configuration and policy-approval gates.
   signals and six-scene Short or six-slide carousel drafts.
 - Client-side JSON, CSV, and pasted-text comment import preparation with
   contract validation, row warnings, and a 100-comment cap.
-- Model-backed analysis that returns exactly three source-backed opportunities:
-  a request, an unanswered question, and a strong reaction.
+- Self-hosted model-backed analysis that returns exactly three source-backed
+  opportunities: a request, an unanswered question, and a strong reaction.
 - Creator-owned YouTube, LinkedIn, or other comment imports with explicit
   rights confirmation and source provenance.
 - A policy-gated YouTube Data API adapter for public or unlisted video metadata
@@ -64,14 +80,14 @@ deliberately marks output provenance as unknown.
 
 | Source | MVP intent | Status |
 | --- | --- | --- |
-| Creator import | Prepare and analyze up to 100 comments supplied as JSON, CSV, or pasted text by a creator who has the right to use them | Client-side parsing and model-backed analysis implemented |
+| Creator import | Prepare and analyze up to 100 comments supplied as JSON, CSV, or pasted text by a creator who has the right to use them | Client parsing in both profiles; model-backed analysis in `self_hosted` |
 | Synthetic demo | Reproduce the full flow with clearly labeled, fictional fixture data | Implemented; explicit opt-in only |
-| YouTube Data API | Read video metadata and top-level comments through an isolated adapter | Implemented; disabled by default |
+| YouTube Data API | Read video metadata and top-level comments through an isolated adapter | `self_hosted` only; disabled by default |
 | LinkedIn direct API | Read comments from a creator's post with approved Community Management API access | Unavailable in the MVP; use creator import |
 
-The YouTube adapter may be enabled only when both `ENABLE_YOUTUBE_API=true` and
-`YOUTUBE_POLICY_APPROVED=true`, after the project owner explicitly confirms the
-use case and implementation comply with the current
+The YouTube adapter may be enabled only in `self_hosted`, and only when both
+`ENABLE_YOUTUBE_API=true` and `YOUTUBE_POLICY_APPROVED=true`, after the project
+owner explicitly confirms the use case and implementation comply with the current
 [YouTube API Services Developer Policies](https://developers.google.com/youtube/terms/developer-policies?hl=en),
 including any required amendment or audit. A configured `YOUTUBE_API_KEY` is
 also required. This project does not use yt-dlp or scrape YouTube.
@@ -96,19 +112,35 @@ stored in the browser.
 
 ## Model-key handling
 
-The model adapter uses the official OpenAI Responses endpoint with
+The self-hosted model adapter uses the official OpenAI Responses endpoint with
 [strict structured output](https://developers.openai.com/api/docs/guides/structured-outputs)
 and `store: false`. The default
 [`gpt-5.6-terra`](https://developers.openai.com/api/docs/models/gpt-5.6-terra)
-model balances intelligence and cost. A server-owned `OPENAI_API_KEY` is
-ignored unless `ENABLE_OPENAI_API=true`. Request-scoped keys are rejected
-unless `ENABLE_OPENAI_BYOK=true`; when enabled, they take precedence for that
-request and are never persisted, cached, logged, or returned.
+model balances intelligence and cost. A local server-owned `LLM_API_KEY` is
+ignored unless the exact `self_hosted` profile and
+`ENABLE_SERVER_LLM_KEY=true` are both active. Request-scoped keys are rejected
+unless `self_hosted` and `ENABLE_OPENAI_BYOK=true`; when enabled, they take
+precedence for that request and are never persisted, cached, logged, or
+returned.
+
+The `public_demo` profile ignores all model, BYOK, and YouTube credentials even
+if they are accidentally configured. Its synthetic analysis and generation
+remain frontend-local; direct API calls never fall back to fixtures or return
+plausible fake success. `/api/capabilities` exposes only flow/policy facts and
+never key presence, fragments, environment values, or internal URLs.
 
 This repository does not yet provide user authentication or durable
 rate-limiting. Do not expose a deployment with a server-owned paid key to the
 public internet without deployment-level access control, quotas, and abuse
 prevention.
+
+For Docker, prefer a runtime secret mounted at
+`/run/secrets/llm_api_key`; a deployment-owned entrypoint may copy it into
+`LLM_API_KEY` immediately before starting the server. Never provide secrets as
+build arguments, commit them, prefix them with `NEXT_PUBLIC_`, or persist them
+in browser storage. Publish a local container on host loopback by default
+(`127.0.0.1:3000:3000`); Next.js still listens on `0.0.0.0:3000` inside a
+bridge-networked container so port forwarding works.
 
 Analysis provenance is established by the server while it handles the source.
 Because the MVP is stateless, `/api/generate` does not trust a caller-provided
@@ -164,7 +196,8 @@ release target.
 
 ```bash
 npm ci
-# Copy .env.example to .env.local; the base works with every feature flag off.
+# Copy .env.example to .env.local. It starts fail-closed in public_demo.
+# For private model-backed work, explicitly set APP_PROFILE=self_hosted.
 npm run dev
 ```
 
@@ -189,14 +222,16 @@ deployment secret store.
 
 | Variable | Example default | Purpose |
 | --- | --- | --- |
-| `ENABLE_OPENAI_API` | `false` | Permit use of the server-owned OpenAI key |
-| `OPENAI_API_KEY` | blank | Server-owned OpenAI credential |
+| `APP_PROFILE` | `public_demo` | Server-owned profile; only exact `self_hosted` enables external workflows |
+| `APP_INSTALLATION` | `private` | Advisory public/private installation fact; not access control |
+| `ENABLE_SERVER_LLM_KEY` | `false` | Explicitly permit the self-hosted server model credential |
+| `LLM_API_KEY` | blank | Local server-owned model credential |
 | `OPENAI_MODEL` | `gpt-5.6-terra` | Responses API model identifier |
 | `OPENAI_REASONING_EFFORT` | `medium` | Reasoning effort for analysis and generation |
 | `OPENAI_TIMEOUT_MS` | `45000` | Whole model-operation timeout, capped below the route budget |
 | `OPENAI_MAX_INPUT_CHARS` | `600000` | Maximum serialized source input size |
-| `ENABLE_OPENAI_BYOK` | `false` | Permit request-scoped model credentials |
-| `ENABLE_YOUTUBE_API` | `false` | First live YouTube source gate |
+| `ENABLE_OPENAI_BYOK` | `false` | Permit request-scoped model credentials in `self_hosted` |
+| `ENABLE_YOUTUBE_API` | `false` | First self-hosted live YouTube source gate |
 | `YOUTUBE_POLICY_APPROVED` | `false` | Required explicit policy-approval gate |
 | `YOUTUBE_API_KEY` | blank | YouTube Data API credential |
 | `ENABLE_N8N` | `false` | Enable the optional n8n handoff |

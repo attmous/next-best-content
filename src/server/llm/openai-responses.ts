@@ -5,6 +5,7 @@ import type {
   StructuredGenerationRequest,
 } from "./provider";
 import { LLMProviderError } from "./provider";
+import { resolveApplicationRuntime } from "../runtime/application-profile";
 
 export {
   LLMProviderError,
@@ -37,6 +38,7 @@ export type FetchLike = (
 export interface OpenAIResponsesProviderOptions {
   fetch?: FetchLike;
   model?: string;
+  requestScopedEnabled?: boolean;
   serverApiKey?: string;
   serverEnabled?: boolean;
   timeoutMs?: number;
@@ -169,6 +171,7 @@ function collectOutputText(payload: JsonRecord): string {
 export class OpenAIResponsesProvider implements LLMProvider {
   private readonly fetch: FetchLike;
   private readonly model: string;
+  private readonly requestScopedEnabled: boolean;
   private readonly serverApiKey?: string;
   private readonly serverEnabled: boolean;
   private readonly timeoutMs: number;
@@ -182,8 +185,11 @@ export class OpenAIResponsesProvider implements LLMProvider {
       options.model,
       DEFAULT_OPENAI_MODEL,
     );
-    this.serverApiKey = options.serverApiKey;
-    this.serverEnabled = options.serverEnabled ?? false;
+    this.requestScopedEnabled = options.requestScopedEnabled === true;
+    this.serverEnabled = options.serverEnabled === true;
+    this.serverApiKey = this.serverEnabled
+      ? options.serverApiKey
+      : undefined;
     this.timeoutMs = boundedInteger(
       options.timeoutMs,
       DEFAULT_TIMEOUT_MS,
@@ -305,6 +311,10 @@ export class OpenAIResponsesProvider implements LLMProvider {
   private resolveApiKey(requestApiKey: string | undefined): string {
     const requestKey = requestApiKey?.trim();
     if (requestKey) {
+      if (!this.requestScopedEnabled) {
+        throw new LLMProviderError("feature_disabled");
+      }
+
       return requestKey;
     }
 
@@ -421,12 +431,16 @@ export function createOpenAIResponsesProviderFromEnv(
   environment: Environment = process.env,
   overrides: OpenAIResponsesEnvironmentOverrides = {},
 ): OpenAIResponsesProvider {
+  const runtime = resolveApplicationRuntime(environment);
+
   return new OpenAIResponsesProvider({
     fetch: overrides.fetch,
     model: environment.OPENAI_MODEL,
-    serverApiKey: environment.OPENAI_API_KEY,
-    serverEnabled:
-      environment.ENABLE_OPENAI_API === "true",
+    requestScopedEnabled: runtime.requestScopedModelKeyAllowed,
+    serverApiKey: runtime.serverModelAvailable
+      ? environment.LLM_API_KEY
+      : undefined,
+    serverEnabled: runtime.serverModelAvailable,
     timeoutMs:
       overrides.timeoutMs ??
       parseEnvironmentInteger(environment.OPENAI_TIMEOUT_MS),

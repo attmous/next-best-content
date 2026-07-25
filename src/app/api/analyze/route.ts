@@ -5,6 +5,8 @@ import {
 } from "@/contracts";
 import { normalizeImportSource } from "@/server/analyze/import-source";
 import { analyzeComments } from "@/server/analyze/service";
+import { validateMutationRequest } from "@/server/api/mutation-request";
+import { profileDisabledResponse } from "@/server/api/profile-disabled";
 import { parseJsonRequest } from "@/server/api/request";
 import {
   apiErrorResponse,
@@ -16,6 +18,7 @@ import {
   type OpenAIResponsesProvider,
 } from "@/server/llm/openai-responses";
 import type { LLMProvider } from "@/server/llm/provider";
+import { resolveApplicationRuntime } from "@/server/runtime/application-profile";
 import {
   createYoutubeCommentSource,
   normalizeYoutubeUrl,
@@ -64,6 +67,15 @@ function modelDisabledResponse() {
   });
 }
 
+function youtubeDisabledResponse() {
+  return apiErrorResponse({
+    code: "FEATURE_DISABLED",
+    message: "Live YouTube analysis is disabled.",
+    retryable: false,
+    status: 503,
+  });
+}
+
 function defaultProvider(
   environment: RuntimeEnvironment,
 ): OpenAIResponsesProvider {
@@ -78,37 +90,42 @@ function defaultYoutubeSource(
 
 function requestAllowsByok(
   request: AnalyzeRequest,
-  environment: RuntimeEnvironment,
+  requestScopedModelKeyAllowed: boolean,
 ): boolean {
   return (
     request.modelApiKey === undefined ||
-    environment.ENABLE_OPENAI_BYOK === "true"
+    requestScopedModelKeyAllowed
   );
 }
 
 function modelIsAvailable(
   request: AnalyzeRequest,
-  environment: RuntimeEnvironment,
-  hasInjectedProvider: boolean,
+  serverModelAvailable: boolean,
+  requestScopedModelKeyAllowed: boolean,
 ): boolean {
-  if (hasInjectedProvider) {
-    return true;
-  }
-
   if (request.modelApiKey !== undefined) {
-    return environment.ENABLE_OPENAI_BYOK === "true";
+    return requestScopedModelKeyAllowed;
   }
 
-  return (
-    environment.ENABLE_OPENAI_API === "true" &&
-    (environment.OPENAI_API_KEY?.trim().length ?? 0) > 0
-  );
+  return serverModelAvailable;
 }
 
 export function createAnalyzeHandler(
   dependencies: AnalyzeRouteDependencies = {},
 ) {
   return async function analyzeRoute(request: Request) {
+    const environment = dependencies.environment ?? process.env;
+    const applicationRuntime =
+      resolveApplicationRuntime(environment);
+    if (applicationRuntime.profile !== "self_hosted") {
+      return profileDisabledResponse();
+    }
+
+    const invalidMutation = validateMutationRequest(request);
+    if (invalidMutation !== undefined) {
+      return invalidMutation;
+    }
+
     const parsedRequest = await parseJsonRequest(
       request,
       AnalyzeRequestSchema,
@@ -118,8 +135,12 @@ export function createAnalyzeHandler(
       return parsedRequest.response;
     }
 
-    const environment = dependencies.environment ?? process.env;
-    if (!requestAllowsByok(parsedRequest.data, environment)) {
+    if (
+      !requestAllowsByok(
+        parsedRequest.data,
+        applicationRuntime.requestScopedModelKeyAllowed,
+      )
+    ) {
       return byokDisabledResponse();
     }
 
@@ -130,11 +151,18 @@ export function createAnalyzeHandler(
     if (
       !modelIsAvailable(
         parsedRequest.data,
-        environment,
-        dependencies.createProvider !== undefined,
+        applicationRuntime.serverModelAvailable,
+        applicationRuntime.requestScopedModelKeyAllowed,
       )
     ) {
       return modelDisabledResponse();
+    }
+
+    if (
+      parsedRequest.data.source.type === "youtube" &&
+      !applicationRuntime.youtubeSourceAvailable
+    ) {
+      return youtubeDisabledResponse();
     }
 
     try {
