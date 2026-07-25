@@ -40,10 +40,15 @@ The public deployment must set `APP_PROFILE=public_demo` and
 
 ### What works now
 
-- A responsive Listen → Decide → Create → Preflight journey at `/`.
+- A responsive public landing page and Listen → Decide → Create → Preflight
+  journey at `/`, including the clearly fictional **Maya Makes Space** case
+  study.
 - A registry-driven source and destination picker: YouTube and creator imports
   on the source side; YouTube Shorts and LinkedIn document posts on the output
   side.
+- Exact UI consumption of `/api/capabilities`: the public demo exposes no
+  external-source forms, self-hosted source actions follow server-owned gates,
+  and live output choices follow the advertised generation targets.
 - Accessible, self-contained inline SVG icons for platforms, actions, statuses,
   and warnings, paired with visible text labels and no remote icon dependency.
 - An explicit, clearly labeled synthetic demo with exactly three audience
@@ -121,7 +126,10 @@ ignored unless the exact `self_hosted` profile and
 `ENABLE_SERVER_LLM_KEY=true` are both active. Request-scoped keys are rejected
 unless `self_hosted` and `ENABLE_OPENAI_BYOK=true`; when enabled, they take
 precedence for that request and are never persisted, cached, logged, or
-returned.
+returned. The UI then exposes an optional password field only in that
+self-hosted profile, holds the key in browser memory for the current
+analysis-and-generation run, and sends it only to the same-origin API. Leaving
+the field blank uses the server-managed key when one is enabled.
 
 The `public_demo` profile ignores all model, BYOK, and YouTube credentials even
 if they are accidentally configured. Its synthetic analysis and generation
@@ -202,6 +210,26 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### Docker Compose
+
+The production image is a non-root, multi-stage Next.js standalone build with
+an application health check. The bundled Compose profile binds only to host
+loopback and starts as a private `self_hosted` installation with model and
+YouTube integrations disabled:
+
+```bash
+docker compose up --build
+```
+
+Open [http://localhost:3000](http://localhost:3000). The synthetic demo remains
+available in this fail-closed state. To enable server-managed model workflows,
+put `ENABLE_SERVER_LLM_KEY=true` and `LLM_API_KEY=...` in a local, ignored
+`.env` file before starting Compose. For stronger secret isolation, mount the
+key as `/run/secrets/llm_api_key`; the container entrypoint reads that file at
+runtime. A YouTube key can likewise be mounted at
+`/run/secrets/youtube_api_key`, but live YouTube still requires both policy
+gates described above.
 
 ### Scripts
 
