@@ -18,7 +18,7 @@ jobs:
   verify:
     name: Verify foundation
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
 
     steps:
       - name: Check out repository
@@ -44,3 +44,36 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Build container image
+        run: docker build --tag next-best-content:ci .
+
+      - name: Smoke-test container health
+        shell: bash
+        run: |
+          container_id="$(
+            docker run \
+              --detach \
+              --publish 127.0.0.1:3000:3000 \
+              next-best-content:ci
+          )"
+          trap 'docker rm --force "$container_id" >/dev/null' EXIT
+
+          for attempt in {1..30}; do
+            response="$(
+              curl \
+                --fail \
+                --silent \
+                http://127.0.0.1:3000/api/health \
+                || true
+            )"
+
+            if [[ "$response" == '{"status":"ok"}' ]]; then
+              exit 0
+            fi
+
+            sleep 1
+          done
+
+          docker logs "$container_id"
+          exit 1
