@@ -79,8 +79,9 @@ describe("OpenAIResponsesProvider", () => {
     const fetch = vi.fn<FetchLike>(async () => successfulResponse());
     const provider = createOpenAIResponsesProviderFromEnv(
       {
-        ENABLE_OPENAI_API: "true",
-        OPENAI_API_KEY: "server-key",
+        APP_PROFILE: "self_hosted",
+        ENABLE_SERVER_LLM_KEY: "true",
+        LLM_API_KEY: "server-key",
       },
       {
         fetch,
@@ -151,6 +152,7 @@ describe("OpenAIResponsesProvider", () => {
     const fetch = vi.fn<FetchLike>(async () => successfulResponse());
     const provider = new OpenAIResponsesProvider({
       fetch,
+      requestScopedEnabled: true,
       serverEnabled: false,
       serverApiKey: "server-key",
     });
@@ -174,6 +176,9 @@ describe("OpenAIResponsesProvider", () => {
       serverEnabled: true,
       serverApiKey: " ",
     });
+    const requestScopedDisabled = new OpenAIResponsesProvider({
+      fetch,
+    });
 
     await expect(
       providerError(disabled.generateStructured(request())),
@@ -187,15 +192,137 @@ describe("OpenAIResponsesProvider", () => {
       kind: "feature_disabled",
       retryable: false,
     });
+    await expect(
+      providerError(
+        requestScopedDisabled.generateStructured(
+          request({ apiKey: "request-key" }),
+        ),
+      ),
+    ).resolves.toMatchObject({
+      kind: "feature_disabled",
+      retryable: false,
+    });
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it("requires the exact lowercase server-key gate", async () => {
+  it.each([
+    {
+      name: "the exact server-key opt-in is absent",
+      environment: {
+        APP_PROFILE: "self_hosted",
+        LLM_API_KEY: "server-key",
+      },
+    },
+    {
+      name: "the server key is absent",
+      environment: {
+        APP_PROFILE: "self_hosted",
+        ENABLE_SERVER_LLM_KEY: "true",
+      },
+    },
+    {
+      name: "the server-key opt-in has the wrong case",
+      environment: {
+        APP_PROFILE: "self_hosted",
+        ENABLE_SERVER_LLM_KEY: "TRUE",
+        LLM_API_KEY: "server-key",
+      },
+    },
+  ])("fails closed when $name", async ({ environment }) => {
+    const fetch = vi.fn<FetchLike>(async () => successfulResponse());
+    const provider = createOpenAIResponsesProviderFromEnv(environment, {
+      fetch,
+    });
+
+    await expect(
+      providerError(provider.generateStructured(request())),
+    ).resolves.toMatchObject({
+      kind: "feature_disabled",
+      retryable: false,
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("ignores every configured credential in the public profile", async () => {
+    const serverKey = "public-server-key-must-be-ignored";
+    const requestKey = "public-request-key-must-be-ignored";
     const fetch = vi.fn<FetchLike>(async () => successfulResponse());
     const provider = createOpenAIResponsesProviderFromEnv(
       {
-        ENABLE_OPENAI_API: "TRUE",
-        OPENAI_API_KEY: "server-key",
+        APP_PROFILE: "public_demo",
+        ENABLE_SERVER_LLM_KEY: "true",
+        LLM_API_KEY: serverKey,
+        ENABLE_OPENAI_BYOK: "true",
+      },
+      { fetch },
+    );
+
+    const serverError = await providerError(
+      provider.generateStructured(request()),
+    );
+    const requestError = await providerError(
+      provider.generateStructured(request({ apiKey: requestKey })),
+    );
+    const serialized = `${String(serverError)} ${serverError.stack ?? ""} ${String(requestError)} ${requestError.stack ?? ""}`;
+
+    expect(serverError.kind).toBe("feature_disabled");
+    expect(requestError.kind).toBe("feature_disabled");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(serialized).not.toContain(serverKey);
+    expect(serialized).not.toContain(requestKey);
+  });
+
+  it("allows a request-scoped key only behind the exact self-hosted gate", async () => {
+    const fetch = vi.fn<FetchLike>(async () => successfulResponse());
+    const enabled = createOpenAIResponsesProviderFromEnv(
+      {
+        APP_PROFILE: "self_hosted",
+        ENABLE_OPENAI_BYOK: "true",
+      },
+      { fetch },
+    );
+
+    await expect(
+      enabled.generateStructured(request({ apiKey: "request-key" })),
+    ).resolves.toEqual({
+      answer: "done",
+    });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(fetch.mock.calls[0][1]?.headers).toMatchObject({
+      Authorization: "Bearer request-key",
+    });
+
+    for (const gate of [undefined, "false", "TRUE"]) {
+      const blockedFetch = vi.fn<FetchLike>(async () =>
+        successfulResponse(),
+      );
+      const blocked = createOpenAIResponsesProviderFromEnv(
+        {
+          APP_PROFILE: "self_hosted",
+          ENABLE_OPENAI_BYOK: gate,
+        },
+        { fetch: blockedFetch },
+      );
+
+      await expect(
+        providerError(
+          blocked.generateStructured(request({ apiKey: "request-key" })),
+        ),
+      ).resolves.toMatchObject({
+        kind: "feature_disabled",
+        retryable: false,
+      });
+      expect(blockedFetch).not.toHaveBeenCalled();
+    }
+  });
+
+  it("does not recognize the legacy OpenAI server credential pair", async () => {
+    const fetch = vi.fn<FetchLike>(async () => successfulResponse());
+    const provider = createOpenAIResponsesProviderFromEnv(
+      {
+        APP_PROFILE: "self_hosted",
+        ENABLE_OPENAI_API: "true",
+        OPENAI_API_KEY: "legacy-server-key",
       },
       { fetch },
     );
@@ -440,7 +567,9 @@ describe("OpenAIResponsesProvider", () => {
     });
 
     const error = await providerError(
-      providerWithFetch(fetch).generateStructured(
+      providerWithFetch(fetch, {
+        requestScopedEnabled: true,
+      }).generateStructured(
         request({
           apiKey,
           systemPrompt,

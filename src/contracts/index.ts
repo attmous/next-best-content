@@ -404,40 +404,148 @@ export const PreflightResponseSchema = z.strictObject({
 export type PreflightResponse = z.infer<typeof PreflightResponseSchema>;
 
 export const CapabilityAvailabilityReasonSchema = z.enum([
-  "enabled",
   "configuration_missing",
   "policy_approval_required",
   "access_not_available",
   "not_implemented",
+  "profile_restricted",
+  "operator_disabled",
 ]);
 export type CapabilityAvailabilityReason = z.infer<
   typeof CapabilityAvailabilityReasonSchema
 >;
 
-export const CapabilityAvailabilitySchema = z.strictObject({
-  available: z.boolean(),
-  reason: CapabilityAvailabilityReasonSchema.optional(),
-});
+export const CapabilityAvailabilitySchema = z.discriminatedUnion(
+  "available",
+  [
+    z.strictObject({
+      available: z.literal(true),
+    }),
+    z.strictObject({
+      available: z.literal(false),
+      reason: CapabilityAvailabilityReasonSchema,
+    }),
+  ],
+);
 export type CapabilityAvailability = z.infer<
   typeof CapabilityAvailabilitySchema
 >;
 
-export const CapabilitiesResponseSchema = z.strictObject({
-  openaiCredentials: z.strictObject({
-    serverManaged: z.boolean(),
-    requestScoped: z.boolean(),
-  }),
-  availability: z.strictObject({
-    openai: CapabilityAvailabilitySchema,
-    import: CapabilityAvailabilitySchema,
-    youtubeLive: CapabilityAvailabilitySchema,
-    linkedinImport: CapabilityAvailabilitySchema,
-    linkedinDirectRead: CapabilityAvailabilitySchema,
-    youtubeShort: CapabilityAvailabilitySchema,
-    linkedinDocument: CapabilityAvailabilitySchema,
-    linkedinPublish: CapabilityAvailabilitySchema,
-  }),
+/**
+ * The application profile enforces server behavior. Installation is an
+ * operator-declared, advisory deployment fact and is never an access-control
+ * signal. Every profile/installation combination is intentionally valid.
+ */
+export const ApplicationProfileSchema = z.enum([
+  "public_demo",
+  "self_hosted",
+]);
+export type ApplicationProfile = z.infer<
+  typeof ApplicationProfileSchema
+>;
+
+export const InstallationSchema = z.enum(["public", "private"]);
+export type Installation = z.infer<typeof InstallationSchema>;
+
+const YoutubeCapabilityTargetSchema = z.strictObject({
+  platform: z.literal("youtube"),
+  format: z.literal("short"),
+  output: z.literal("short"),
+  generation: CapabilityAvailabilitySchema,
 });
+
+const LinkedinCapabilityTargetSchema = z.strictObject({
+  platform: z.literal("linkedin"),
+  format: z.literal("carousel"),
+  output: z.literal("document"),
+  generation: CapabilityAvailabilitySchema,
+});
+
+export const CapabilityTargetsSchema = z.tuple([
+  YoutubeCapabilityTargetSchema,
+  LinkedinCapabilityTargetSchema,
+]);
+export type CapabilityTargets = z.infer<
+  typeof CapabilityTargetsSchema
+>;
+
+function sameAvailability(
+  left: CapabilityAvailability,
+  right: CapabilityAvailability,
+): boolean {
+  return (
+    left.available === right.available &&
+    (left.available ||
+      (!right.available && left.reason === right.reason))
+  );
+}
+
+export const CapabilitiesResponseSchema = z
+  .strictObject({
+    profile: ApplicationProfileSchema,
+    installation: InstallationSchema,
+    availability: z.strictObject({
+      demo: CapabilityAvailabilitySchema,
+      modelBackedWorkflows: CapabilityAvailabilitySchema,
+      requestScopedModelKey: CapabilityAvailabilitySchema,
+      /**
+       * Deprecated exact alias of modelBackedWorkflows. Retained during the
+       * atomic consumer migration only.
+       */
+      openai: CapabilityAvailabilitySchema,
+      /** Creator-owned, rights-confirmed import processing. */
+      import: CapabilityAvailabilitySchema,
+      youtubeLive: CapabilityAvailabilitySchema,
+      /** LinkedIn-labeled creator import, not a direct LinkedIn read. */
+      linkedinImport: CapabilityAvailabilitySchema,
+      linkedinDirectRead: CapabilityAvailabilitySchema,
+      youtubeShort: CapabilityAvailabilitySchema,
+      linkedinDocument: CapabilityAvailabilitySchema,
+      linkedinPublish: CapabilityAvailabilitySchema,
+    }),
+    targets: CapabilityTargetsSchema,
+  })
+  .superRefine((capabilities, context) => {
+    const invariants = [
+      {
+        matches: sameAvailability(
+          capabilities.availability.openai,
+          capabilities.availability.modelBackedWorkflows,
+        ),
+        path: ["availability", "openai"],
+        message:
+          "openai must exactly match modelBackedWorkflows",
+      },
+      {
+        matches: sameAvailability(
+          capabilities.availability.youtubeShort,
+          capabilities.targets[0].generation,
+        ),
+        path: ["availability", "youtubeShort"],
+        message:
+          "youtubeShort must exactly match the YouTube target generation capability",
+      },
+      {
+        matches: sameAvailability(
+          capabilities.availability.linkedinDocument,
+          capabilities.targets[1].generation,
+        ),
+        path: ["availability", "linkedinDocument"],
+        message:
+          "linkedinDocument must exactly match the LinkedIn target generation capability",
+      },
+    ] as const;
+
+    for (const invariant of invariants) {
+      if (!invariant.matches) {
+        context.addIssue({
+          code: "custom",
+          message: invariant.message,
+          path: [...invariant.path],
+        });
+      }
+    }
+  });
 export type CapabilitiesResponse = z.infer<
   typeof CapabilitiesResponseSchema
 >;

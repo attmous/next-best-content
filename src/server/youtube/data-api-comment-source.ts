@@ -2,6 +2,7 @@ import {
   VideoMetadataSchema,
   type VideoMetadata,
 } from "@/contracts";
+import { resolveApplicationRuntime } from "@/server/runtime/application-profile";
 import { z } from "zod";
 
 import type {
@@ -109,6 +110,8 @@ export type FetchLike = (
 ) => Promise<Response>;
 
 export interface YoutubeSourceEnvironment {
+  readonly [key: string]: string | undefined;
+  APP_PROFILE?: string;
   ENABLE_YOUTUBE_API?: string;
   YOUTUBE_POLICY_APPROVED?: string;
   YOUTUBE_API_KEY?: string;
@@ -481,12 +484,17 @@ export function createYoutubeCommentSource(
   options: YoutubeCommentSourceFactoryOptions = {},
 ): CommentSource {
   const environment = options.environment ?? {
+    APP_PROFILE: process.env.APP_PROFILE,
     ENABLE_YOUTUBE_API: process.env.ENABLE_YOUTUBE_API,
     YOUTUBE_POLICY_APPROVED: process.env.YOUTUBE_POLICY_APPROVED,
     YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
   };
+  const runtime = resolveApplicationRuntime(environment);
 
-  if (!featureEnabled(environment)) {
+  if (
+    !runtime.youtubeSourceAvailable ||
+    !featureEnabled(environment)
+  ) {
     return new DisabledYoutubeCommentSource();
   }
 

@@ -102,6 +102,37 @@ const generateRequest: GenerateRequest = {
   },
 };
 
+const selfHostedWithoutModelEnvironment = {
+  APP_PROFILE: "self_hosted",
+  APP_INSTALLATION: "private",
+} as const;
+
+const selfHostedEnvironment = {
+  ...selfHostedWithoutModelEnvironment,
+  ENABLE_SERVER_LLM_KEY: "true",
+  LLM_API_KEY: "test-server-key",
+} as const;
+
+const selfHostedYoutubeEnvironment = {
+  ...selfHostedEnvironment,
+  ENABLE_YOUTUBE_API: "true",
+  YOUTUBE_POLICY_APPROVED: "true",
+  YOUTUBE_API_KEY: "youtube-key",
+} as const;
+
+const publicDemoEnvironment = {
+  APP_PROFILE: "public_demo",
+  APP_INSTALLATION: "public",
+  ENABLE_SERVER_LLM_KEY: "true",
+  LLM_API_KEY: "configured-server-secret",
+  ENABLE_OPENAI_API: "true",
+  OPENAI_API_KEY: "configured-legacy-secret",
+  ENABLE_OPENAI_BYOK: "true",
+  ENABLE_YOUTUBE_API: "true",
+  YOUTUBE_POLICY_APPROVED: "true",
+  YOUTUBE_API_KEY: "configured-youtube-secret",
+} as const;
+
 class StaticProvider implements LLMProvider {
   lastApiKey: string | undefined;
 
@@ -123,11 +154,16 @@ class FailingProvider implements LLMProvider {
   }
 }
 
-function jsonRequest(path: string, body: unknown): Request {
+function jsonRequest(
+  path: string,
+  body: unknown,
+  headers: HeadersInit = {},
+): Request {
   return new Request(`http://localhost${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...headers,
     },
     body: JSON.stringify(body),
   });
@@ -161,14 +197,144 @@ function importAnalyzeBody(commentList: Evidence[] = comments) {
 }
 
 describe("POST /api/analyze", () => {
+  it("rejects every public-demo analysis path before parsing or constructing dependencies", async () => {
+    const createProvider = vi.fn(() => new StaticProvider(analysisDraft));
+    const createYoutubeSource = vi.fn(() => ({
+      getComments: vi.fn(),
+    }));
+    const analyze = createAnalyzeHandler({
+      environment: publicDemoEnvironment,
+      createProvider,
+      createYoutubeSource,
+    });
+    const submittedSecret = "submitted-public-secret";
+    const forbiddenValues = [
+      submittedSecret,
+      publicDemoEnvironment.LLM_API_KEY,
+      publicDemoEnvironment.OPENAI_API_KEY,
+      publicDemoEnvironment.YOUTUBE_API_KEY,
+    ];
+    const requests = [
+      jsonRequest("/api/analyze", {
+        ...importAnalyzeBody([
+          { ...comments[0], text: submittedSecret },
+          ...comments.slice(1),
+        ]),
+      }),
+      jsonRequest("/api/analyze", {
+        youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+        source: { type: "youtube" },
+      }),
+      jsonRequest("/api/analyze", { source: { type: "demo" } }),
+      jsonRequest("/api/analyze", {
+        ...importAnalyzeBody(),
+        modelApiKey: submittedSecret,
+      }),
+      rawRequest("/api/analyze", `{"secret":"${submittedSecret}"`),
+      rawRequest(
+        "/api/analyze",
+        `{"secret":"${submittedSecret}${"x".repeat(2 * 1024 * 1024)}"}`,
+      ),
+      new Request("http://localhost/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain",
+          Origin: "https://attacker.example",
+        },
+        body: submittedSecret,
+      }),
+    ];
+
+    const errors = [];
+    for (const request of requests) {
+      const response = await analyze(request);
+      const rawResult = await response.json();
+      const result = ApiErrorResponseSchema.parse(rawResult);
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(result.error.code).toBe("FEATURE_DISABLED");
+      expect(result.error.retryable).toBe(false);
+      for (const forbiddenValue of forbiddenValues) {
+        expect(JSON.stringify(rawResult)).not.toContain(
+          forbiddenValue,
+        );
+      }
+      errors.push(result.error);
+    }
+
+    expect(new Set(errors.map((error) => error.requestId)).size).toBe(
+      errors.length,
+    );
+    expect(createProvider).not.toHaveBeenCalled();
+    expect(createYoutubeSource).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: "unsupported media type",
+      headers: new Headers({ "Content-Type": "text/plain" }),
+      status: 415,
+      code: "VALIDATION_ERROR",
+    },
+    {
+      name: "cross-origin JSON",
+      headers: new Headers({
+        "Content-Type": "application/json",
+        Origin: "https://attacker.example",
+      }),
+      status: 403,
+      code: "FEATURE_DISABLED",
+    },
+  ] as const)(
+    "rejects $name before reading the analysis body or constructing dependencies",
+    async ({ headers, status, code }) => {
+      const createProvider = vi.fn(
+        () => new StaticProvider(analysisDraft),
+      );
+      const createYoutubeSource = vi.fn(() => ({
+        getComments: vi.fn(),
+      }));
+      const analyze = createAnalyzeHandler({
+        environment: selfHostedYoutubeEnvironment,
+        createProvider,
+        createYoutubeSource,
+      });
+      const submittedSecret = "guarded-analysis-secret";
+      const response = await analyze(
+        new Request("http://localhost/api/analyze", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            youtubeUrl: `https://youtu.be/dQw4w9WgXcQ?value=${submittedSecret}`,
+            source: { type: "youtube" },
+          }),
+        }),
+      );
+      const rawResult = await response.json();
+      const result = ApiErrorResponseSchema.parse(rawResult);
+
+      expect(response.status).toBe(status);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(result.error.code).toBe(code);
+      expect(result.error.retryable).toBe(false);
+      expect(JSON.stringify(rawResult)).not.toContain(submittedSecret);
+      expect(createProvider).not.toHaveBeenCalled();
+      expect(createYoutubeSource).not.toHaveBeenCalled();
+    },
+  );
+
   it("analyzes a creator-owned import and preserves truthful provenance", async () => {
     const analyze = createAnalyzeHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider: () => new StaticProvider(analysisDraft),
     });
 
     const response = await analyze(
-      jsonRequest("/api/analyze", importAnalyzeBody()),
+      jsonRequest("/api/analyze", importAnalyzeBody(), {
+        Origin: "http://localhost",
+        "Sec-Fetch-Site": "same-origin",
+      }),
     );
 
     expect(response.status).toBe(200);
@@ -220,7 +386,7 @@ describe("POST /api/analyze", () => {
       },
     };
     const analyze = createAnalyzeHandler({
-      environment: {},
+      environment: selfHostedYoutubeEnvironment,
       createProvider: () => new StaticProvider(youtubeDraft),
       createYoutubeSource: () => ({ getComments }),
     });
@@ -254,7 +420,7 @@ describe("POST /api/analyze", () => {
   it("returns typed validation errors for malformed and invalid input", async () => {
     const createProvider = vi.fn(() => new StaticProvider(analysisDraft));
     const analyze = createAnalyzeHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider,
     });
 
@@ -279,7 +445,7 @@ describe("POST /api/analyze", () => {
 
   it("rejects imports with too little evidence", async () => {
     const analyze = createAnalyzeHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider: () => new StaticProvider(analysisDraft),
     });
 
@@ -296,7 +462,7 @@ describe("POST /api/analyze", () => {
   it("keeps demo analysis and request-scoped keys explicitly gated", async () => {
     const createProvider = vi.fn(() => new StaticProvider(analysisDraft));
     const analyze = createAnalyzeHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider,
     });
 
@@ -323,6 +489,7 @@ describe("POST /api/analyze", () => {
     const provider = new StaticProvider(analysisDraft);
     const analyze = createAnalyzeHandler({
       environment: {
+        ...selfHostedEnvironment,
         ENABLE_OPENAI_BYOK: "true",
       },
       createProvider: () => provider,
@@ -345,6 +512,7 @@ describe("POST /api/analyze", () => {
     }));
     const analyze = createAnalyzeHandler({
       environment: {
+        ...selfHostedWithoutModelEnvironment,
         ENABLE_YOUTUBE_API: "true",
         YOUTUBE_POLICY_APPROVED: "true",
         YOUTUBE_API_KEY: "youtube-key",
@@ -365,9 +533,51 @@ describe("POST /api/analyze", () => {
     expect(createYoutubeSource).not.toHaveBeenCalled();
   });
 
+  it("does not let an injected provider bypass model configuration", async () => {
+    const createProvider = vi.fn(() => new StaticProvider(analysisDraft));
+    const analyze = createAnalyzeHandler({
+      environment: selfHostedWithoutModelEnvironment,
+      createProvider,
+    });
+
+    const response = await analyze(
+      jsonRequest("/api/analyze", importAnalyzeBody()),
+    );
+    const result = ApiErrorResponseSchema.parse(await response.json());
+
+    expect(response.status).toBe(503);
+    expect(result.error.code).toBe("FEATURE_DISABLED");
+    expect(result.error.retryable).toBe(false);
+    expect(createProvider).not.toHaveBeenCalled();
+  });
+
+  it("does not let an injected source bypass self-hosted YouTube policy gates", async () => {
+    const createYoutubeSource = vi.fn(() => ({
+      getComments: vi.fn(),
+    }));
+    const analyze = createAnalyzeHandler({
+      environment: selfHostedEnvironment,
+      createProvider: () => new StaticProvider(analysisDraft),
+      createYoutubeSource,
+    });
+
+    const response = await analyze(
+      jsonRequest("/api/analyze", {
+        youtubeUrl: "https://youtu.be/dQw4w9WgXcQ",
+        source: { type: "youtube" },
+      }),
+    );
+    const result = ApiErrorResponseSchema.parse(await response.json());
+
+    expect(response.status).toBe(503);
+    expect(result.error.code).toBe("FEATURE_DISABLED");
+    expect(result.error.retryable).toBe(false);
+    expect(createYoutubeSource).not.toHaveBeenCalled();
+  });
+
   it("maps sanitized source and model failures without leaking details", async () => {
     const youtubeFailure = createAnalyzeHandler({
-      environment: {},
+      environment: selfHostedYoutubeEnvironment,
       createProvider: () => new StaticProvider(analysisDraft),
       createYoutubeSource: () => ({
         getComments: async () => {
@@ -376,7 +586,7 @@ describe("POST /api/analyze", () => {
       }),
     });
     const modelFailure = createAnalyzeHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider: () =>
         new FailingProvider(new LLMProviderError("invalid_output")),
     });
@@ -400,7 +610,9 @@ describe("POST /api/analyze", () => {
   });
 
   it("assigns unique request IDs to separate failures", async () => {
-    const analyze = createAnalyzeHandler({ environment: {} });
+    const analyze = createAnalyzeHandler({
+      environment: selfHostedEnvironment,
+    });
     const first = ApiErrorResponseSchema.parse(
       await (await analyze(rawRequest("/api/analyze", "{"))).json(),
     );
@@ -413,9 +625,113 @@ describe("POST /api/analyze", () => {
 });
 
 describe("POST /api/generate", () => {
+  it("rejects every public-demo generation path before parsing or constructing a provider", async () => {
+    const createProvider = vi.fn(() => new StaticProvider(generatedDraft));
+    const generate = createGenerateHandler({
+      environment: publicDemoEnvironment,
+      createProvider,
+    });
+    const submittedSecret = "submitted-generation-secret";
+    const requests = [
+      jsonRequest("/api/generate", generateRequest),
+      jsonRequest("/api/generate", {
+        ...generateRequest,
+        format: "carousel",
+        target: {
+          platform: "linkedin",
+          output: "document",
+        },
+      }),
+      jsonRequest("/api/generate", {
+        ...generateRequest,
+        modelApiKey: submittedSecret,
+      }),
+      rawRequest("/api/generate", `{"secret":"${submittedSecret}"`),
+      new Request("http://localhost/api/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain",
+          Origin: "https://attacker.example",
+        },
+        body: submittedSecret,
+      }),
+    ];
+
+    const errors = [];
+    for (const request of requests) {
+      const response = await generate(request);
+      const rawResult = await response.json();
+      const result = ApiErrorResponseSchema.parse(rawResult);
+
+      expect(response.status).toBe(503);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(result.error.code).toBe("FEATURE_DISABLED");
+      expect(result.error.retryable).toBe(false);
+      expect(JSON.stringify(rawResult)).not.toContain(submittedSecret);
+      errors.push(result.error);
+    }
+
+    expect(new Set(errors.map((error) => error.requestId)).size).toBe(
+      errors.length,
+    );
+    expect(createProvider).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: "unsupported media type",
+      headers: new Headers({ "Content-Type": "text/plain" }),
+      status: 415,
+      code: "VALIDATION_ERROR",
+    },
+    {
+      name: "cross-origin JSON",
+      headers: new Headers({
+        "Content-Type": "application/json",
+        Origin: "https://attacker.example",
+      }),
+      status: 403,
+      code: "FEATURE_DISABLED",
+    },
+  ] as const)(
+    "rejects $name before reading the generation body or constructing a provider",
+    async ({ headers, status, code }) => {
+      const createProvider = vi.fn(
+        () => new StaticProvider(generatedDraft),
+      );
+      const generate = createGenerateHandler({
+        environment: selfHostedEnvironment,
+        createProvider,
+      });
+      const submittedSecret = "guarded-generation-secret";
+      const response = await generate(
+        new Request("http://localhost/api/generate", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            ...generateRequest,
+            signal: {
+              ...generateRequest.signal,
+              summary: submittedSecret,
+            },
+          }),
+        }),
+      );
+      const rawResult = await response.json();
+      const result = ApiErrorResponseSchema.parse(rawResult);
+
+      expect(response.status).toBe(status);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(result.error.code).toBe(code);
+      expect(result.error.retryable).toBe(false);
+      expect(JSON.stringify(rawResult)).not.toContain(submittedSecret);
+      expect(createProvider).not.toHaveBeenCalled();
+    },
+  );
+
   it("generates a YouTube Short content pack", async () => {
     const generate = createGenerateHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider: () => new StaticProvider(generatedDraft),
     });
 
@@ -426,6 +742,9 @@ describe("POST /api/generate", () => {
           source: "youtube",
           evidence: "live",
         },
+      }, {
+        Origin: "http://localhost",
+        "Sec-Fetch-Site": "same-origin",
       }),
     );
 
@@ -458,7 +777,7 @@ describe("POST /api/generate", () => {
 
   it("generates a zero-duration LinkedIn document draft", async () => {
     const generate = createGenerateHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider: () => new StaticProvider(generatedDraft),
     });
 
@@ -482,7 +801,7 @@ describe("POST /api/generate", () => {
 
   it("rejects malformed JSON and incompatible targets before generation", async () => {
     const generate = createGenerateHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider: () => new StaticProvider(generatedDraft),
     });
 
@@ -508,7 +827,7 @@ describe("POST /api/generate", () => {
   it("keeps BYOK disabled unless its explicit gate is enabled", async () => {
     const createProvider = vi.fn(() => new StaticProvider(generatedDraft));
     const generate = createGenerateHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider,
     });
 
@@ -531,6 +850,7 @@ describe("POST /api/generate", () => {
     const provider = new StaticProvider(generatedDraft);
     const generate = createGenerateHandler({
       environment: {
+        ...selfHostedEnvironment,
         ENABLE_OPENAI_BYOK: "true",
       },
       createProvider: () => provider,
@@ -547,9 +867,29 @@ describe("POST /api/generate", () => {
     expect(provider.lastApiKey).toBe("request-secret");
   });
 
+  it("does not let an injected provider bypass generation model configuration", async () => {
+    const createProvider = vi.fn(
+      () => new StaticProvider(generatedDraft),
+    );
+    const generate = createGenerateHandler({
+      environment: selfHostedWithoutModelEnvironment,
+      createProvider,
+    });
+
+    const response = await generate(
+      jsonRequest("/api/generate", generateRequest),
+    );
+    const result = ApiErrorResponseSchema.parse(await response.json());
+
+    expect(response.status).toBe(503);
+    expect(result.error.code).toBe("FEATURE_DISABLED");
+    expect(result.error.retryable).toBe(false);
+    expect(createProvider).not.toHaveBeenCalled();
+  });
+
   it("maps provider failures to typed, non-cacheable responses", async () => {
     const generate = createGenerateHandler({
-      environment: {},
+      environment: selfHostedEnvironment,
       createProvider: () =>
         new FailingProvider(new LLMProviderError("authentication")),
     });

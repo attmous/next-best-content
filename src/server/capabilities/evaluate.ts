@@ -2,70 +2,77 @@ import {
   CapabilitiesResponseSchema,
   type CapabilitiesResponse,
   type CapabilityAvailability,
+  type CapabilityAvailabilityReason,
 } from "@/contracts";
+import {
+  resolveApplicationRuntime,
+  type RuntimeEnvironment,
+} from "@/server/runtime/application-profile";
 
-type RuntimeEnvironment = Record<string, string | undefined>;
+const AVAILABLE = { available: true } as const satisfies CapabilityAvailability;
 
-function enabled(value: string | undefined): boolean {
-  return value === "true";
-}
-
-function configured(value: string | undefined): boolean {
-  return typeof value === "string" && value.trim().length > 0;
-}
-
-function availability(
-  available: boolean,
-  reason:
-    | CapabilityAvailability["reason"]
-    | undefined = undefined,
+function unavailable(
+  reason: CapabilityAvailabilityReason | undefined,
 ): CapabilityAvailability {
   return {
-    available,
-    ...(available || reason === undefined ? {} : { reason }),
+    available: false,
+    reason: reason ?? "configuration_missing",
   };
 }
 
 export function evaluateCapabilities(
   environment: RuntimeEnvironment = process.env,
 ): CapabilitiesResponse {
-  const serverOpenaiAvailable =
-    enabled(environment.ENABLE_OPENAI_API) &&
-    configured(environment.OPENAI_API_KEY);
-  const byokAvailable = enabled(environment.ENABLE_OPENAI_BYOK);
-  const openaiAvailable = serverOpenaiAvailable || byokAvailable;
-  const openaiReason = openaiAvailable
-    ? undefined
-    : ("configuration_missing" as const);
-
-  const youtubePolicyApproved = enabled(
-    environment.YOUTUBE_POLICY_APPROVED,
-  );
-  const youtubeConfigured =
-    enabled(environment.ENABLE_YOUTUBE_API) &&
-    configured(environment.YOUTUBE_API_KEY);
-  const youtubeAvailable =
-    openaiAvailable && youtubePolicyApproved && youtubeConfigured;
-  const youtubeReason = !youtubePolicyApproved
-    ? ("policy_approval_required" as const)
-    : !openaiAvailable || !youtubeConfigured
-      ? ("configuration_missing" as const)
-      : undefined;
+  const runtime = resolveApplicationRuntime(environment);
+  const modelBackedWorkflows = runtime.modelBackedWorkflowsAvailable
+    ? AVAILABLE
+    : unavailable(runtime.modelUnavailableReason);
+  const requestScopedModelKey = runtime.requestScopedModelKeyAllowed
+    ? AVAILABLE
+    : unavailable(
+        runtime.profile === "public_demo"
+          ? "profile_restricted"
+          : "operator_disabled",
+      );
+  const youtubeLive = runtime.youtubeLiveAvailable
+    ? AVAILABLE
+    : unavailable(runtime.youtubeUnavailableReason);
 
   return CapabilitiesResponseSchema.parse({
-    openaiCredentials: {
-      serverManaged: serverOpenaiAvailable,
-      requestScoped: byokAvailable,
-    },
+    profile: runtime.profile,
+    installation: runtime.installation,
     availability: {
-      openai: availability(openaiAvailable, openaiReason),
-      import: availability(openaiAvailable, openaiReason),
-      youtubeLive: availability(youtubeAvailable, youtubeReason),
-      linkedinImport: availability(openaiAvailable, openaiReason),
-      linkedinDirectRead: availability(false, "access_not_available"),
-      youtubeShort: availability(openaiAvailable, openaiReason),
-      linkedinDocument: availability(openaiAvailable, openaiReason),
-      linkedinPublish: availability(false, "not_implemented"),
+      // The demo is a client-owned synthetic journey, not an analyze source.
+      demo: AVAILABLE,
+      modelBackedWorkflows,
+      requestScopedModelKey,
+      // Deprecated exact alias retained for an atomic UI migration.
+      openai: modelBackedWorkflows,
+      // Generic import means a rights-confirmed, creator-owned data import.
+      import: modelBackedWorkflows,
+      youtubeLive,
+      // This is accepted LinkedIn labeling on creator-owned import data.
+      linkedinImport: modelBackedWorkflows,
+      linkedinDirectRead: unavailable("access_not_available"),
+      youtubeShort: modelBackedWorkflows,
+      linkedinDocument: modelBackedWorkflows,
+      linkedinPublish: unavailable("not_implemented"),
     },
+    // Targets describe model-backed output generation. They remain visible
+    // when generation is unavailable so the synthetic demo can show formats.
+    targets: [
+      {
+        platform: "youtube",
+        format: "short",
+        output: "short",
+        generation: modelBackedWorkflows,
+      },
+      {
+        platform: "linkedin",
+        format: "carousel",
+        output: "document",
+        generation: modelBackedWorkflows,
+      },
+    ],
   });
 }

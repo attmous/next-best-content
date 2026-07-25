@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ApplicationProfileSchema,
   AnalyzeRequestSchema,
   AnalyzeResponseSchema,
   ApiErrorResponseSchema,
+  CapabilityAvailabilitySchema,
   CapabilitiesResponseSchema,
   ContentPackSchema,
   ContentTargetSchema,
   GenerateRequestSchema,
   IMPORT_THUMBNAIL_PLACEHOLDER,
+  InstallationSchema,
   PreflightRequestSchema,
   SourceAssetSchema,
   SourcePlatformSchema,
@@ -410,33 +413,86 @@ describe("platform-neutral source and target schemas", () => {
 
 describe("CapabilitiesResponseSchema", () => {
   const capabilities = {
-    openaiCredentials: {
-      serverManaged: true,
-      requestScoped: false,
-    },
+    profile: "self_hosted",
+    installation: "private",
     availability: {
-      openai: { available: true, reason: "enabled" },
-      import: { available: true, reason: "enabled" },
+      demo: { available: true },
+      modelBackedWorkflows: {
+        available: false,
+        reason: "configuration_missing",
+      },
+      requestScopedModelKey: {
+        available: false,
+        reason: "operator_disabled",
+      },
+      openai: {
+        available: false,
+        reason: "configuration_missing",
+      },
+      import: {
+        available: false,
+        reason: "configuration_missing",
+      },
       youtubeLive: {
         available: false,
         reason: "policy_approval_required",
       },
-      linkedinImport: { available: true, reason: "enabled" },
+      linkedinImport: {
+        available: false,
+        reason: "configuration_missing",
+      },
       linkedinDirectRead: {
         available: false,
         reason: "access_not_available",
       },
       youtubeShort: { available: false, reason: "configuration_missing" },
-      linkedinDocument: { available: false, reason: "not_implemented" },
+      linkedinDocument: {
+        available: false,
+        reason: "configuration_missing",
+      },
       linkedinPublish: { available: false, reason: "not_implemented" },
     },
+    targets: [
+      {
+        platform: "youtube",
+        format: "short",
+        output: "short",
+        generation: {
+          available: false,
+          reason: "configuration_missing",
+        },
+      },
+      {
+        platform: "linkedin",
+        format: "carousel",
+        output: "document",
+        generation: {
+          available: false,
+          reason: "configuration_missing",
+        },
+      },
+    ],
   } as const;
 
-  it("requires all declared availability entries", () => {
+  it("accepts the complete response and every orthogonal profile/installation combination", () => {
     expect(CapabilitiesResponseSchema.safeParse(capabilities).success).toBe(
       true,
     );
 
+    for (const profile of ApplicationProfileSchema.options) {
+      for (const installation of InstallationSchema.options) {
+        expect(
+          CapabilitiesResponseSchema.safeParse({
+            ...capabilities,
+            profile,
+            installation,
+          }).success,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("requires all declared availability entries", () => {
     const incompleteAvailability = Object.fromEntries(
       Object.entries(capabilities.availability).filter(
         ([name]) => name !== "linkedinPublish",
@@ -445,6 +501,7 @@ describe("CapabilitiesResponseSchema", () => {
 
     expect(
       CapabilitiesResponseSchema.safeParse({
+        ...capabilities,
         availability: incompleteAvailability,
       }).success,
     ).toBe(false);
@@ -453,6 +510,7 @@ describe("CapabilitiesResponseSchema", () => {
   it("rejects unknown capability reasons and entries", () => {
     expect(
       CapabilitiesResponseSchema.safeParse({
+        ...capabilities,
         availability: {
           ...capabilities.availability,
           openai: { available: false, reason: "temporarily_unavailable" },
@@ -461,6 +519,7 @@ describe("CapabilitiesResponseSchema", () => {
     ).toBe(false);
     expect(
       CapabilitiesResponseSchema.safeParse({
+        ...capabilities,
         availability: {
           ...capabilities.availability,
           extraProvider: { available: true },
@@ -469,10 +528,104 @@ describe("CapabilitiesResponseSchema", () => {
     ).toBe(false);
   });
 
-  it("requires explicit server-managed and request-scoped credential modes", () => {
+  it("requires unavailable reasons and forbids reasons on available capabilities", () => {
+    expect(
+      CapabilityAvailabilitySchema.safeParse({
+        available: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      CapabilityAvailabilitySchema.safeParse({
+        available: true,
+        reason: "operator_disabled",
+      }).success,
+    ).toBe(false);
+    expect(
+      CapabilityAvailabilitySchema.safeParse({
+        available: false,
+        reason: "enabled",
+      }).success,
+    ).toBe(false);
+    expect(
+      CapabilityAvailabilitySchema.safeParse({
+        available: true,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires the exact ordered target descriptors", () => {
     expect(
       CapabilitiesResponseSchema.safeParse({
-        availability: capabilities.availability,
+        ...capabilities,
+        targets: [...capabilities.targets].reverse(),
+      }).success,
+    ).toBe(false);
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        ...capabilities,
+        targets: [
+          {
+            ...capabilities.targets[0],
+            output: "document",
+          },
+          capabilities.targets[1],
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("enforces capability aliases and target-generation invariants", () => {
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        ...capabilities,
+        availability: {
+          ...capabilities.availability,
+          openai: {
+            available: false,
+            reason: "operator_disabled",
+          },
+        },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        ...capabilities,
+        availability: {
+          ...capabilities.availability,
+          youtubeShort: {
+            available: false,
+            reason: "operator_disabled",
+          },
+        },
+      }).success,
+    ).toBe(false);
+
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        ...capabilities,
+        targets: [
+          capabilities.targets[0],
+          {
+            ...capabilities.targets[1],
+            generation: {
+              available: false,
+              reason: "operator_disabled",
+            },
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it("does not accept the removed credential-presence object", () => {
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        ...capabilities,
+        openaiCredentials: {
+          serverManaged: true,
+          requestScoped: false,
+        },
       }).success,
     ).toBe(false);
   });

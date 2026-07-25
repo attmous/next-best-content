@@ -2,6 +2,8 @@ import {
   ContentPackSchema,
   GenerateRequestSchema,
 } from "@/contracts";
+import { validateMutationRequest } from "@/server/api/mutation-request";
+import { profileDisabledResponse } from "@/server/api/profile-disabled";
 import { parseJsonRequest } from "@/server/api/request";
 import {
   apiErrorResponse,
@@ -14,6 +16,7 @@ import {
   type OpenAIResponsesProvider,
 } from "@/server/llm/openai-responses";
 import type { LLMProvider } from "@/server/llm/provider";
+import { resolveApplicationRuntime } from "@/server/runtime/application-profile";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -35,27 +38,32 @@ function defaultProvider(
 
 function modelIsAvailable(
   modelApiKey: string | undefined,
-  environment: RuntimeEnvironment,
-  hasInjectedProvider: boolean,
+  serverModelAvailable: boolean,
+  requestScopedModelKeyAllowed: boolean,
 ): boolean {
-  if (hasInjectedProvider) {
-    return true;
-  }
-
   if (modelApiKey !== undefined) {
-    return environment.ENABLE_OPENAI_BYOK === "true";
+    return requestScopedModelKeyAllowed;
   }
 
-  return (
-    environment.ENABLE_OPENAI_API === "true" &&
-    (environment.OPENAI_API_KEY?.trim().length ?? 0) > 0
-  );
+  return serverModelAvailable;
 }
 
 export function createGenerateHandler(
   dependencies: GenerateRouteDependencies = {},
 ) {
   return async function generateRoute(request: Request) {
+    const environment = dependencies.environment ?? process.env;
+    const applicationRuntime =
+      resolveApplicationRuntime(environment);
+    if (applicationRuntime.profile !== "self_hosted") {
+      return profileDisabledResponse();
+    }
+
+    const invalidMutation = validateMutationRequest(request);
+    if (invalidMutation !== undefined) {
+      return invalidMutation;
+    }
+
     const parsedRequest = await parseJsonRequest(
       request,
       GenerateRequestSchema,
@@ -65,10 +73,9 @@ export function createGenerateHandler(
       return parsedRequest.response;
     }
 
-    const environment = dependencies.environment ?? process.env;
     if (
       parsedRequest.data.modelApiKey !== undefined &&
-      environment.ENABLE_OPENAI_BYOK !== "true"
+      !applicationRuntime.requestScopedModelKeyAllowed
     ) {
       return apiErrorResponse({
         code: "FEATURE_DISABLED",
@@ -81,8 +88,8 @@ export function createGenerateHandler(
     if (
       !modelIsAvailable(
         parsedRequest.data.modelApiKey,
-        environment,
-        dependencies.createProvider !== undefined,
+        applicationRuntime.serverModelAvailable,
+        applicationRuntime.requestScopedModelKeyAllowed,
       )
     ) {
       return apiErrorResponse({
