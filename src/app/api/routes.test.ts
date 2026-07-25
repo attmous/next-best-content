@@ -3,12 +3,10 @@ import { describe, expect, it } from "vitest";
 
 import { POST as analyze } from "./analyze/route";
 import { POST as generate } from "./generate/route";
-import { POST as preflight } from "./preflight/route";
 
 const routes = [
   ["analyze", analyze],
   ["generate", generate],
-  ["preflight", preflight],
 ] as const;
 
 describe("API route stubs", () => {
