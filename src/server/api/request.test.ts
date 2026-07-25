@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { parseJsonRequest } from "./request";
+import { MAX_JSON_REQUEST_BYTES } from "./request";
 
 function jsonRequest(body: unknown): Request {
   return new Request("https://example.test/api/test", {
@@ -185,5 +186,86 @@ describe("parseJsonRequest", () => {
       truncated: true,
     });
     expect(details?.issues).toHaveLength(20);
+  });
+
+  it("rejects oversized bodies before parsing or echoing them", async () => {
+    const submittedText = "private-oversized-value";
+    const request = new Request("https://example.test/api/test", {
+      method: "POST",
+      headers: {
+        "Content-Length": String(MAX_JSON_REQUEST_BYTES + 1),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ value: submittedText }),
+    });
+
+    const result = await parseJsonRequest(
+      request,
+      z.strictObject({ value: z.string() }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected the oversized request to fail.");
+    }
+
+    const responseText = await result.response.text();
+    const body = ApiErrorResponseSchema.parse(JSON.parse(responseText));
+
+    expect(result.response.status).toBe(413);
+    expect(body.error).toMatchObject({
+      code: "VALIDATION_ERROR",
+      retryable: false,
+    });
+    expect(responseText).not.toContain(submittedText);
+  });
+
+  it("enforces the byte limit when content length is unavailable", async () => {
+    const request = new Request("https://example.test/api/test", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        value: "x".repeat(MAX_JSON_REQUEST_BYTES),
+      }),
+    });
+
+    const result = await parseJsonRequest(
+      request,
+      z.strictObject({ value: z.string() }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected the oversized request to fail.");
+    }
+
+    expect(result.response.status).toBe(413);
+  });
+
+  it("collapses unexpected schema failures into a generic internal error", async () => {
+    const privateFailure = "private-refinement-failure";
+    const schema = z.string().superRefine(() => {
+      throw new Error(privateFailure);
+    });
+
+    const result = await parseJsonRequest(
+      jsonRequest("submitted-value"),
+      schema,
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) {
+      throw new Error("Expected the refinement to fail.");
+    }
+
+    const responseText = await result.response.text();
+    const body = ApiErrorResponseSchema.parse(JSON.parse(responseText));
+
+    expect(result.response.status).toBe(500);
+    expect(body.error.code).toBe("INTERNAL_ERROR");
+    expect(responseText).not.toContain(privateFailure);
+    expect(responseText).not.toContain("submitted-value");
   });
 });

@@ -12,7 +12,37 @@ export const CONTRACT_LIMITS = {
 const IdentifierSchema = z.string().trim().min(1).max(128);
 const ShortTextSchema = z.string().trim().min(1).max(500);
 const LongTextSchema = z.string().trim().min(1).max(5_000);
-const UrlSchema = z.string().url().max(CONTRACT_LIMITS.url);
+
+function usesProtocol(value: string, protocols: readonly string[]): boolean {
+  try {
+    return protocols.includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+}
+
+const RequestUrlSchema = z
+  .string()
+  .url()
+  .max(CONTRACT_LIMITS.url)
+  .refine(
+    (value) => usesProtocol(value, ["https:", "http:"]),
+    "URL must use HTTP or HTTPS",
+  );
+const HttpsUrlSchema = z
+  .string()
+  .url()
+  .max(CONTRACT_LIMITS.url)
+  .refine(
+    (value) => usesProtocol(value, ["https:"]),
+    "URL must use HTTPS",
+  );
+export const IMPORT_THUMBNAIL_PLACEHOLDER =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+const ThumbnailUrlSchema = z.union([
+  HttpsUrlSchema,
+  z.literal(IMPORT_THUMBNAIL_PLACEHOLDER),
+]);
 const ScoreSchema = z.number().int().min(0).max(100);
 const ModelApiKeySchema = z
   .string()
@@ -23,11 +53,81 @@ const ModelApiKeySchema = z
 export const ContentFormatSchema = z.enum(["short", "carousel"]);
 export type ContentFormat = z.infer<typeof ContentFormatSchema>;
 
+export const SourcePlatformSchema = z.enum([
+  "youtube",
+  "linkedin",
+  "other",
+]);
+export type SourcePlatform = z.infer<typeof SourcePlatformSchema>;
+
+export const SourceAssetSchema = z.strictObject({
+  platform: SourcePlatformSchema,
+  kind: z.enum(["video", "post", "import"]),
+  id: IdentifierSchema.optional(),
+  title: ShortTextSchema.optional(),
+  creatorName: ShortTextSchema.optional(),
+  thumbnailUrl: ThumbnailUrlSchema.optional(),
+  canonicalUrl: HttpsUrlSchema.optional(),
+  sampledCommentCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .max(CONTRACT_LIMITS.comments),
+});
+export type SourceAsset = z.infer<typeof SourceAssetSchema>;
+
+const YoutubeContentTargetSchema = z.strictObject({
+  platform: z.literal("youtube"),
+  output: z.literal("short"),
+});
+
+const LinkedinContentTargetSchema = z.strictObject({
+  platform: z.literal("linkedin"),
+  output: z.literal("document"),
+});
+
+export const ContentTargetSchema = z.discriminatedUnion("platform", [
+  YoutubeContentTargetSchema,
+  LinkedinContentTargetSchema,
+]);
+export type ContentTarget = z.infer<typeof ContentTargetSchema>;
+
+function targetMatchesFormat(
+  format: ContentFormat,
+  target: ContentTarget | undefined,
+): boolean {
+  return (
+    target === undefined ||
+    (format === "short" &&
+      target.platform === "youtube" &&
+      target.output === "short") ||
+    (format === "carousel" &&
+      target.platform === "linkedin" &&
+      target.output === "document")
+  );
+}
+
+function addTargetFormatIssue(
+  value: {
+    format: ContentFormat;
+    target?: ContentTarget;
+  },
+  context: z.RefinementCtx,
+): void {
+  if (!targetMatchesFormat(value.format, value.target)) {
+    context.addIssue({
+      code: "custom",
+      message: "Content target is incompatible with the content format",
+      path: ["target"],
+    });
+  }
+}
+
 export const VideoMetadataSchema = z.strictObject({
   id: IdentifierSchema,
   title: ShortTextSchema,
   channelTitle: ShortTextSchema,
-  thumbnailUrl: UrlSchema,
+  thumbnailUrl: ThumbnailUrlSchema,
   commentCount: z.number().int().nonnegative().optional(),
 });
 export type VideoMetadata = z.infer<typeof VideoMetadataSchema>;
@@ -75,6 +175,7 @@ const YoutubeProvenanceSchema = z.strictObject({
 const ImportProvenanceSchema = z.strictObject({
   source: z.literal("import"),
   evidence: z.literal("creator_supplied"),
+  platform: SourcePlatformSchema,
 });
 
 const DemoProvenanceSchema = z.strictObject({
@@ -102,8 +203,11 @@ const YoutubeAnalyzeSourceSchema = z.strictObject({
 
 const ImportAnalyzeSourceSchema = z.strictObject({
   type: z.literal("import"),
+  platform: SourcePlatformSchema,
+  rightsConfirmed: z.literal(true),
   comments: z.array(EvidenceSchema).max(CONTRACT_LIMITS.comments),
   video: VideoMetadataSchema.optional(),
+  sourceAsset: SourceAssetSchema.optional(),
 });
 
 const DemoAnalyzeSourceSchema = z.strictObject({
@@ -117,27 +221,42 @@ export const AnalyzeSourceSchema = z.discriminatedUnion("type", [
 ]);
 export type AnalyzeSource = z.infer<typeof AnalyzeSourceSchema>;
 
-export const AnalyzeRequestSchema = z.strictObject({
-  youtubeUrl: UrlSchema,
-  modelApiKey: ModelApiKeySchema.optional(),
-  source: AnalyzeSourceSchema,
-});
+export const AnalyzeRequestSchema = z
+  .strictObject({
+    youtubeUrl: RequestUrlSchema.optional(),
+    modelApiKey: ModelApiKeySchema.optional(),
+    source: AnalyzeSourceSchema,
+  })
+  .superRefine((request, context) => {
+    if (request.source.type === "youtube" && request.youtubeUrl === undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "A YouTube URL is required for YouTube analysis",
+        path: ["youtubeUrl"],
+      });
+    }
+  });
 export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
 
 export const AnalyzeResponseSchema = z.strictObject({
   video: VideoMetadataSchema,
   signals: z.array(SignalSchema).length(CONTRACT_LIMITS.signals),
   provenance: ProvenanceSchema,
+  sourceAsset: SourceAssetSchema.optional(),
 });
 export type AnalyzeResponse = z.infer<typeof AnalyzeResponseSchema>;
 
-export const GenerateRequestSchema = z.strictObject({
-  video: VideoMetadataSchema,
-  signal: SignalSchema,
-  format: ContentFormatSchema,
-  modelApiKey: ModelApiKeySchema.optional(),
-  provenance: ProvenanceSchema.optional(),
-});
+export const GenerateRequestSchema = z
+  .strictObject({
+    video: VideoMetadataSchema,
+    signal: SignalSchema,
+    format: ContentFormatSchema,
+    modelApiKey: ModelApiKeySchema.optional(),
+    provenance: ProvenanceSchema.optional(),
+    sourceAsset: SourceAssetSchema.optional(),
+    target: ContentTargetSchema.optional(),
+  })
+  .superRefine(addTargetFormatIssue);
 export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
 
 export const SceneSchema = z.strictObject({
@@ -167,8 +286,12 @@ export const ContentPackSchema = z
       .max(CONTRACT_LIMITS.comments),
     sourceSignal: SignalSchema,
     provenance: ProvenanceSchema,
+    sourceAsset: SourceAssetSchema.optional(),
+    target: ContentTargetSchema.optional(),
   })
   .superRefine((contentPack, context) => {
+    addTargetFormatIssue(contentPack, context);
+
     if (contentPack.format === "short") {
       const totalDuration = contentPack.scenes.reduce(
         (total, scene) => total + scene.durationSeconds,
@@ -211,25 +334,29 @@ export type PreflightDraftScene = z.infer<
   typeof PreflightDraftSceneSchema
 >;
 
-export const PreflightDraftContentPackSchema = z.strictObject({
-  id: IdentifierSchema.optional(),
-  format: ContentFormatSchema,
-  title: DraftTextSchema,
-  hook: DraftTextSchema,
-  angle: DraftTextSchema,
-  scenes: z
-    .array(PreflightDraftSceneSchema)
-    .max(CONTRACT_LIMITS.preflightScenes),
-  caption: DraftTextSchema,
-  cta: DraftTextSchema,
-  hashtags: z.array(DraftTextSchema).max(30),
-  sourceEvidence: z
-    .array(EvidenceSchema)
-    .max(CONTRACT_LIMITS.comments)
-    .optional(),
-  sourceSignal: SignalSchema.optional(),
-  provenance: ProvenanceSchema.optional(),
-});
+export const PreflightDraftContentPackSchema = z
+  .strictObject({
+    id: IdentifierSchema.optional(),
+    format: ContentFormatSchema,
+    title: DraftTextSchema,
+    hook: DraftTextSchema,
+    angle: DraftTextSchema,
+    scenes: z
+      .array(PreflightDraftSceneSchema)
+      .max(CONTRACT_LIMITS.preflightScenes),
+    caption: DraftTextSchema,
+    cta: DraftTextSchema,
+    hashtags: z.array(DraftTextSchema).max(30),
+    sourceEvidence: z
+      .array(EvidenceSchema)
+      .max(CONTRACT_LIMITS.comments)
+      .optional(),
+    sourceSignal: SignalSchema.optional(),
+    provenance: ProvenanceSchema.optional(),
+    sourceAsset: SourceAssetSchema.optional(),
+    target: ContentTargetSchema.optional(),
+  })
+  .superRefine(addTargetFormatIssue);
 export type PreflightDraftContentPack = z.infer<
   typeof PreflightDraftContentPackSchema
 >;
@@ -275,6 +402,45 @@ export const PreflightResponseSchema = z.strictObject({
   blockingIssues: z.array(LongTextSchema).max(20),
 });
 export type PreflightResponse = z.infer<typeof PreflightResponseSchema>;
+
+export const CapabilityAvailabilityReasonSchema = z.enum([
+  "enabled",
+  "configuration_missing",
+  "policy_approval_required",
+  "access_not_available",
+  "not_implemented",
+]);
+export type CapabilityAvailabilityReason = z.infer<
+  typeof CapabilityAvailabilityReasonSchema
+>;
+
+export const CapabilityAvailabilitySchema = z.strictObject({
+  available: z.boolean(),
+  reason: CapabilityAvailabilityReasonSchema.optional(),
+});
+export type CapabilityAvailability = z.infer<
+  typeof CapabilityAvailabilitySchema
+>;
+
+export const CapabilitiesResponseSchema = z.strictObject({
+  openaiCredentials: z.strictObject({
+    serverManaged: z.boolean(),
+    requestScoped: z.boolean(),
+  }),
+  availability: z.strictObject({
+    openai: CapabilityAvailabilitySchema,
+    import: CapabilityAvailabilitySchema,
+    youtubeLive: CapabilityAvailabilitySchema,
+    linkedinImport: CapabilityAvailabilitySchema,
+    linkedinDirectRead: CapabilityAvailabilitySchema,
+    youtubeShort: CapabilityAvailabilitySchema,
+    linkedinDocument: CapabilityAvailabilitySchema,
+    linkedinPublish: CapabilityAvailabilitySchema,
+  }),
+});
+export type CapabilitiesResponse = z.infer<
+  typeof CapabilitiesResponseSchema
+>;
 
 export const ApiErrorCodeSchema = z.enum([
   "VALIDATION_ERROR",
