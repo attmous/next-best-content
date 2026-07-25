@@ -41,7 +41,7 @@ describe("parseYoutubeUrl", () => {
   });
 
   it("rejects YouTube pages without a video", () => {
-    expect(parseYoutubeUrl("https://www.youtube.com/@ChaosAdam13")).toEqual({
+    expect(parseYoutubeUrl("https://www.youtube.com/@MayaMakesSpace")).toEqual({
       ok: false,
       reason: "no_video",
     });

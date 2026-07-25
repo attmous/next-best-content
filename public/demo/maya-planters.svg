@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img">
+  <title>Synthetic illustration: three labeled wooden planters with basil, mint, and thyme seedlings</title>
+  <rect width="800" height="500" fill="#12160f"/>
+  <ellipse cx="400" cy="470" rx="360" ry="26" fill="#0d100c"/>
+  <!-- planter 1: basil -->
+  <g>
+    <path d="M70 300 h180 l-18 130 h-144 Z" fill="#7a5c40"/>
+    <rect x="60" y="286" width="200" height="22" rx="6" fill="#8d6b4a"/>
+    <g stroke="#57a04f" stroke-width="6" fill="none" stroke-linecap="round">
+      <path d="M130 286 C 128 250, 138 234, 132 210"/>
+      <path d="M170 286 C 172 246, 164 228, 172 202"/>
+      <path d="M200 286 C 202 254, 196 240, 202 222"/>
+    </g>
+    <g fill="#5fae57">
+      <ellipse cx="120" cy="206" rx="26" ry="18"/><ellipse cx="162" cy="190" rx="30" ry="20"/>
+      <ellipse cx="206" cy="208" rx="24" ry="16"/>
+    </g>
+    <ellipse cx="150" cy="176" rx="16" ry="11" fill="#8fd06a"/>
+    <g>
+      <rect x="96" y="330" width="128" height="34" rx="6" fill="#f4f3ee"/>
+      <text x="160" y="353" font-family="Georgia, serif" font-size="22" fill="#131408" text-anchor="middle">basil</text>
+    </g>
+  </g>
+  <!-- planter 2: mint -->
+  <g>
+    <path d="M310 300 h180 l-18 130 h-144 Z" fill="#6d523a"/>
+    <rect x="300" y="286" width="200" height="22" rx="6" fill="#7f6044"/>
+    <g stroke="#4d9a52" stroke-width="5" fill="none" stroke-linecap="round">
+      <path d="M360 286 C 356 244, 368 226, 360 200"/>
+      <path d="M400 286 C 404 240, 392 222, 402 194"/>
+      <path d="M440 286 C 444 250, 434 234, 442 214"/>
+    </g>
+    <g fill="#63b96a">
+      <ellipse cx="352" cy="196" rx="22" ry="15"/><ellipse cx="398" cy="182" rx="26" ry="17"/>
+      <ellipse cx="444" cy="200" rx="22" ry="15"/><ellipse cx="420" cy="222" rx="18" ry="12"/>
+    </g>
+    <g>
+      <rect x="336" y="330" width="128" height="34" rx="6" fill="#f4f3ee"/>
+      <text x="400" y="353" font-family="Georgia, serif" font-size="22" fill="#131408" text-anchor="middle">mint</text>
+    </g>
+  </g>
+  <!-- planter 3: thyme -->
+  <g>
+    <path d="M550 300 h180 l-18 130 h-144 Z" fill="#7a5c40"/>
+    <rect x="540" y="286" width="200" height="22" rx="6" fill="#8d6b4a"/>
+    <g stroke="#6a9b4e" stroke-width="4" fill="none" stroke-linecap="round">
+      <path d="M600 286 C 592 254, 604 240, 596 220"/>
+      <path d="M636 286 C 640 248, 630 234, 640 212"/>
+      <path d="M672 286 C 678 256, 668 244, 676 226"/>
+    </g>
+    <g fill="#7cae5a">
+      <ellipse cx="594" cy="218" rx="16" ry="10"/><ellipse cx="638" cy="206" rx="18" ry="11"/>
+      <ellipse cx="678" cy="222" rx="15" ry="9"/><ellipse cx="656" cy="238" rx="13" ry="8"/>
+    </g>
+    <g>
+      <rect x="576" y="330" width="128" height="34" rx="6" fill="#f4f3ee"/>
+      <text x="640" y="353" font-family="Georgia, serif" font-size="22" fill="#131408" text-anchor="middle">thyme</text>
+    </g>
+  </g>
+  <!-- price tag motif -->
+  <g transform="rotate(-8 700 120)">
+    <rect x="640" y="90" width="120" height="56" rx="10" fill="#c9f24f"/>
+    <circle cx="656" cy="118" r="6" fill="#131408"/>
+    <text x="716" y="126" font-family="Georgia, serif" font-size="26" fill="#131408" text-anchor="middle">€93</text>
+  </g>
+  <rect x="0" y="0" width="800" height="500" fill="none" stroke="#2b3027" stroke-width="2"/>
+</svg>

@@ -1,11 +1,12 @@
 /**
  * Synthetic demo fixtures for NextBestContent.
  *
- * Everything in this file is fictional. The video metadata points at Adam
- * Vagovic's channel (ChaosAdam13) as the agreed demo entry point, but every
- * comment, author handle, signal, and generated scene is invented for the
- * demo and is labeled as synthetic through the `demo` provenance the UI
- * surfaces on every screen. No real YouTube comments are included.
+ * Everything in this file is fictional. "Maya Makes Space" is an invented
+ * creator, the balcony-garden video is an invented upload, and every comment,
+ * handle, signal, and generated scene was written for this demo. The `demo`
+ * provenance carried on every response keeps that visible in the UI, and the
+ * accompanying illustrations in /public/demo are original synthetic artwork.
+ * No real people, channels, or YouTube comments are represented.
  */
 import {
   AnalyzeResponseSchema,
@@ -20,9 +21,10 @@ import {
   type VideoMetadata,
 } from "@/contracts";
 
-export const DEMO_FIXTURE_ID = "chaosadam13-dinner-rush-v1";
+export const DEMO_FIXTURE_ID = "maya-makes-space-balcony-v1";
 
-export const DEMO_VIDEO_URL = "https://www.youtube.com/watch?v=sjMHLfUwWL0";
+/** Fictional watch URL for the synthetic upload — the video id is invented. */
+export const DEMO_VIDEO_URL = "https://www.youtube.com/watch?v=my2m2balcny";
 
 export const DEMO_PROVENANCE: Provenance = {
   source: "demo",
@@ -30,135 +32,159 @@ export const DEMO_PROVENANCE: Provenance = {
   fixtureId: DEMO_FIXTURE_ID,
 };
 
+/** Locally shipped synthetic illustrations for the fictional case study. */
+export const DEMO_ASSETS = {
+  balconyBefore: {
+    src: "/demo/maya-balcony-before.svg",
+    alt: "Synthetic illustration of the empty 2 square meter balcony before the garden: bare floor, railing, and one unused pot.",
+  },
+  balconyAfter: {
+    src: "/demo/maya-balcony-after.svg",
+    alt: "Synthetic illustration of the balcony after the makeover: railing planters, a vertical herb rack, and tomato pots.",
+  },
+  planters: {
+    src: "/demo/maya-planters.svg",
+    alt: "Synthetic illustration of three labeled wooden planters with basil, mint, and thyme seedlings and a 93 euro price tag.",
+  },
+  watering: {
+    src: "/demo/maya-watering.svg",
+    alt: "Synthetic illustration of the sunrise watering routine: a watering can pouring over a planter beside a moisture guide.",
+  },
+  lesson: {
+    src: "/demo/maya-lesson.svg",
+    alt: "Synthetic illustration of the honest failure: a bolted spinach pot with drooping leaves next to a week-six lesson note.",
+  },
+} as const;
+
 const demoVideo: VideoMetadata = {
-  id: "sjMHLfUwWL0",
-  title: "I Cooked a 3-Course Dinner in 30 Minutes (Total Chaos)",
-  channelTitle: "ChaosAdam13",
+  id: "my2m2balcny",
+  title: "I Turned a 2m² Balcony Into a Food Garden",
+  channelTitle: "Maya Makes Space",
   // Deliberately non-resolving: the demo is fully synthetic, so the UI
-  // renders a labeled placeholder instead of fetching any real thumbnail.
-  thumbnailUrl: "https://demo.invalid/fixtures/chaosadam13-dinner-rush.jpg",
-  commentCount: 482,
+  // renders the locally shipped illustration instead of fetching anything.
+  thumbnailUrl: "https://demo.invalid/fixtures/maya-balcony-after.jpg",
+  commentCount: 341,
 };
 
-const requestEvidence: Evidence[] = [
+const shoppingListEvidence: Evidence[] = [
   {
-    author: "maren.cooks",
-    text: "PLEASE make a version of this for people who can't dice an onion in ten seconds. I want to cook this menu, just at normal human speed.",
-    likeCount: 212,
+    author: "first_balcony_flat",
+    text: "Please just list exactly what you bought and what it cost. Every video skips the boring part and the boring part is what I need.",
+    likeCount: 187,
   },
   {
-    author: "kitchen_flop_era",
-    text: "I tried this and my sauce broke twice. Can you do a beginner walkthrough with the exact order of steps?",
-    likeCount: 148,
+    author: "renting_not_rooted",
+    text: "I have a 1.8m balcony and no idea what to buy first. A starter list with a real budget would be everything.",
+    likeCount: 142,
   },
   {
-    author: "dev_by_day_chef_by_night",
-    text: "Genuine request: same three courses, but you explain what to prep before the clock starts.",
-    likeCount: 96,
-  },
-];
-
-const questionEvidence: Evidence[] = [
-  {
-    author: "sear_seeker",
-    text: "What pan is that?? Mine would have smoked out the whole kitchen at that heat.",
-    likeCount: 173,
-  },
-  {
-    author: "tam_makes_dinner",
-    text: "You never say what heat the sauce simmers at and mine reduced to glue. Please answer this one!",
-    likeCount: 121,
-  },
-  {
-    author: "quiet.kitchen",
-    text: "Third video where I'm asking: induction or gas? It changes every single timing in this recipe.",
-    likeCount: 88,
+    author: "thrifty.thyme",
+    text: "What did the whole setup honestly cost, including the soil and the failures? Asking before I commit my deposit money.",
+    likeCount: 93,
   },
 ];
 
-const reactionEvidence: Evidence[] = [
+const wateringEvidence: Evidence[] = [
   {
-    author: "flavor_gremlin",
-    text: "The way you SAVED that sauce after the smoke alarm went off is the most useful forty seconds on cooking YouTube.",
-    likeCount: 341,
+    author: "sunny.side.flat",
+    text: "It hit 34°C here and my basil collapsed by noon. How often are you actually watering in summer??",
+    likeCount: 164,
   },
   {
-    author: "midnight_meal_prep",
-    text: "Not the recipe — the RECOVERY. More of you fixing disasters in real time, please.",
-    likeCount: 205,
+    author: "second_floor_sprouts",
+    text: "Morning or evening? Once or twice a day? You show the watering can but never the schedule!",
+    likeCount: 118,
   },
   {
-    author: "aprons_off",
-    text: "I have burnt that exact sauce three times. Watching you fix it instead of restarting was everything.",
-    likeCount: 167,
+    author: "wilted.wednesday",
+    text: "Third time asking: how much water per pot when it's really hot? Mine either drown or crisp.",
+    likeCount: 87,
+  },
+];
+
+const whatFailedEvidence: Evidence[] = [
+  {
+    author: "compost_confessions",
+    text: "The 30 seconds where you admitted the spinach bolted was more useful than every perfect balcony tour on this app.",
+    likeCount: 231,
+  },
+  {
+    author: "growing_pains_gal",
+    text: "Please make a full video about what died and why. Nobody shows the failures and that's why beginners quit.",
+    likeCount: 176,
+  },
+  {
+    author: "aphid_survivor",
+    text: "Lost my mint the exact same way. What would you change if you started the balcony again from zero?",
+    likeCount: 119,
   },
 ];
 
 const demoSignals: Signal[] = [
   {
-    id: "sig-request-beginner-menu",
+    id: "sig-request-shopping-list",
     category: "request",
-    title: "Make a beginner-proof version of the 30-minute menu",
+    title: "A beginner shopping list with an honest budget",
     summary:
-      "The single most repeated ask in the thread: viewers loved the chaos, but they want the same three-course menu re-taught at a pace they can actually follow, with prep laid out before the clock starts.",
-    opportunityScore: 86,
+      "The most repeated ask in the thread: viewers want the exact starter list with real prices. They don't know what to buy first, and they're afraid of hidden costs the pretty tour never mentions.",
+    opportunityScore: 84,
     scoreReasons: [
-      "Asked explicitly 24 times across the comment thread",
-      "Request comments collect the highest like counts after the pinned comment",
-      "Directly extends the original video instead of starting a new topic",
+      "Asked explicitly 21 times across the comment thread",
+      "Budget-anxiety comments collect the highest like counts",
+      "Directly extends the original video instead of a new topic",
     ],
-    evidenceCount: 24,
-    evidence: requestEvidence,
+    evidenceCount: 21,
+    evidence: shoppingListEvidence,
     recommendation: {
-      workingTitle: "The 30-Minute Dinner, Slowed Down to Human Speed",
-      hook: "Twenty-four of you asked for this exact video — the chaos menu, one calm step at a time.",
-      suggestedFormat: "short",
-      rationale:
-        "A tight walkthrough Short answers the request directly and points viewers back to the full-length original. The audience already told you the format problem: speed. Slowing it down is the content.",
-    },
-  },
-  {
-    id: "sig-question-heat-setup",
-    category: "unanswered_question",
-    title: "What pan and heat are you actually using?",
-    summary:
-      "The most repeated question you never answered: viewers blame their failed attempts on not knowing your pan, burner type, and heat levels. It comes up under every cooking upload, not just this one.",
-    opportunityScore: 78,
-    scoreReasons: [
-      "17 unanswered comments ask about equipment or heat settings",
-      "Recurs across multiple uploads, so one answer keeps working",
-      "Viewers explicitly connect it to their failed attempts",
-    ],
-    evidenceCount: 17,
-    evidence: questionEvidence,
-    recommendation: {
-      workingTitle: "The Heat Answer: My Exact Pan and Burner Settings",
-      hook: "The most-asked question in my comments, finally answered — the exact pan, burner, and heat for every step.",
+      workingTitle: "The 2m² Starter Garden: Full Shopping List, Real Budget",
+      hook: "Everything I bought for the balcony garden — with the honest prices, including the two mistakes.",
       suggestedFormat: "carousel",
       rationale:
-        "Settings are reference material. A carousel viewers can save and swipe through beats a video they'd have to scrub, and it becomes an evergreen answer you can link under future comments.",
+        "A shopping list is reference material. A swipeable document viewers can save beats a video they'd have to scrub, and it becomes the evergreen answer to the most-asked question under the upload.",
     },
   },
   {
-    id: "sig-reaction-sauce-save",
-    category: "strong_reaction",
-    title: "The burnt-sauce save set your comments on fire",
+    id: "sig-question-watering",
+    category: "unanswered_question",
+    title: "A simple watering schedule for hot weather",
     summary:
-      "The strongest emotional spike in the whole thread: the moment the sauce burned and you rescued it live. Viewers say the recovery was more valuable than the recipe and are asking for more real-time fixes.",
-    opportunityScore: 82,
+      "The most repeated question that never got an answer: how often and how much to water when it's genuinely hot. Viewers blame the missing schedule for scorched herbs and drowned pots.",
+    opportunityScore: 78,
     scoreReasons: [
-      "31 comments reference the same 40-second moment",
-      "Top reaction comment out-liked every other comment on the video",
-      "Viewers name the exact follow-up they want: more live recoveries",
+      "17 unanswered comments ask about summer watering",
+      "Viewers explicitly connect it to their failed attempts",
+      "One clear schedule can be pinned and reused every summer",
     ],
-    evidenceCount: 31,
-    evidence: reactionEvidence,
+    evidenceCount: 17,
+    evidence: wateringEvidence,
     recommendation: {
-      workingTitle: "Save the Sauce: Rescue a Burnt Pan in 60 Seconds",
-      hook: "Your comments exploded the second the sauce burned — so here's the full rescue, step by step.",
+      workingTitle: "The Hot-Week Watering Schedule (Steal This)",
+      hook: "The schedule that kept a 2m² garden alive through a 34-degree week — when, how much, and the one check that decides it.",
       suggestedFormat: "short",
       rationale:
-        "The audience already marked the highlight for you. Cutting the recovery into a standalone Short serves the 31 people who asked and tests a repeatable 'kitchen rescue' series format.",
+        "Three memorable rules land perfectly as a Short: answer the question once, pin it under the original video, and point every future summer comment at it.",
+    },
+  },
+  {
+    id: "sig-reaction-what-failed",
+    category: "strong_reaction",
+    title: "Your honesty about what died struck a nerve",
+    summary:
+      "The strongest reaction in the whole thread: the short segment admitting the spinach bolted and aphids took the mint. Viewers say the honesty is why they trust the channel — and they want the full failure breakdown.",
+    opportunityScore: 81,
+    scoreReasons: [
+      "26 comments reference the same honest moment",
+      "Top reaction comment out-liked everything else on the video",
+      "Viewers name the exact follow-up they want: what failed and why",
+    ],
+    evidenceCount: 26,
+    evidence: whatFailedEvidence,
+    recommendation: {
+      workingTitle: "What Died in My Balcony Garden (And What I'd Change)",
+      hook: "The comments blew up at the one honest moment — so here is everything that failed in the 2m² garden, and what I'd do differently.",
+      suggestedFormat: "short",
+      rationale:
+        "The audience already marked the highlight. A standalone failure breakdown serves the 26 people who asked and tests an honest 'what went wrong' series the channel can repeat.",
     },
   },
 ];
@@ -194,182 +220,197 @@ interface PackDraft {
 
 const packDrafts: PackDraft[] = [
   {
-    signalId: "sig-request-beginner-menu",
+    signalId: "sig-request-shopping-list",
     angle:
-      "Answer the 24 beginner requests head-on: the same three-course menu, re-taught calmly with prep front-loaded, so viewers finish with dinner instead of a broken sauce.",
+      "Answer the 21 budget questions head-on: the exact starter list for a 2m² food garden with honest prices, including the two purchases to skip.",
     caption:
-      "You asked 24 times, so here it is: the 30-minute chaos menu, slowed down to human speed. Prep list first, then each course in the order that actually works. Save this for your next dinner attempt and tell me which course still fights back.",
-    cta: "Save this for your next dinner attempt",
-    hashtags: ["#cooking", "#beginnercook", "#30minutemeals", "#dinnerideas"],
+      "The full 2m² balcony garden shopping list — with the honest budget, including the two purchases I'd skip today. €93 all in. Save this for the garden center and tell me what your balcony's first crop will be.",
+    cta: "Save this list for your first garden-center trip",
+    hashtags: [
+      "#balconygarden",
+      "#urbangardening",
+      "#beginnergardener",
+      "#foodgarden",
+    ],
     shortDurations: [4, 6, 7, 7, 7, 5],
     scenes: [
       {
-        headline: "You asked. Here it is.",
-        body: "The 30-minute chaos menu, rebuilt for beginners at human speed.",
+        headline: "The honest starter list",
+        body: "Everything for a 2m² food garden — with the real prices.",
         visualDirection:
-          "Calm kitchen, no timer on screen. Three labeled prep bowls slide into frame one by one.",
+          "Title card over the finished balcony illustration; a price-tag motif in the corner.",
         voiceover:
-          "Twenty-four of you asked for this exact video. So here it is — the chaos menu, slowed all the way down.",
+          "Twenty-one of you asked for the exact list. So here it is — everything I bought, with the honest numbers.",
       },
       {
-        headline: "Prep before the clock",
-        body: "Dice the onion, measure the stock, butter out of the fridge. Nothing touches heat until this tray is full.",
+        headline: "Containers: €38",
+        body: "Three 50cm planter boxes, one vertical rail rack, saucers. Skip terracotta for now — it dries out fastest.",
         visualDirection:
-          "Top-down shot of a sheet tray filling with prepped ingredients, each labeled with a lower-third tag.",
+          "Flat-lay of the planters with price labels appearing one by one.",
         voiceover:
-          "Beginners lose the race in the first minute. So we don't race. Everything gets prepped onto one tray before a single burner turns on.",
+          "Containers first: three fifty-centimeter boxes and one vertical rack for the railing. Thirty-eight euros.",
       },
       {
-        headline: "Course one: the salad that waits",
-        body: "Dress it last, build it first. This course sits happily while you cook the rest.",
+        headline: "Soil and food: €22",
+        body: "40L of container mix plus slow-release feed. Cheap topsoil is the classic first-garden mistake.",
         visualDirection:
-          "Hands assemble the salad in a wide bowl; dressing jar set aside with a 'wait' sticker.",
+          "Soil bag pouring into a planter; a small 'not topsoil' callout.",
         voiceover:
-          "Course one is the salad, and its secret is patience — build it now, dress it at the very end so it never wilts.",
+          "Soil is where beginners get burned. Container mix, not topsoil, plus slow-release feed — twenty-two euros.",
       },
       {
-        headline: "Course two: sauce without fear",
-        body: "Medium-low heat, wooden spoon, and one rule: the sauce is done the moment it coats the back of the spoon. If you walk away to plate the salad or check on the dessert, it seizes into glue — so stay with the pan until it ribbons.",
+        headline: "Seeds and starts: €19",
+        body: "Basil, mint, and cherry tomato starts plus spinach and radish seed packets. Buy starts for slow herbs and seeds for fast growers — starts skip the six fragile weeks, and seeds cost almost nothing when the plant grows quickly anyway.",
         visualDirection:
-          "Close-up of sauce ribboning off a wooden spoon; a gentle heat-dial graphic pinned at medium-low.",
+          "Seedling tray beside seed packets; split label 'starts vs seeds'.",
         voiceover:
-          "The sauce is where your comments say it all goes wrong. Medium-low heat, keep it moving, and stop the moment it coats the spoon.",
+          "Plants: buy starts for the slow herbs, seeds for the fast growers. Nineteen euros covers the lot.",
       },
       {
-        headline: "Course three: dessert on autopilot",
-        body: "It bakes while you plate everything else. Set the timer and forget it exists.",
+        headline: "Tools that matter: €14",
+        body: "A watering can with a rose head, snips, and a moisture meter. That's it — no gadget drawer.",
         visualDirection:
-          "Ramekins slide into the oven; cut to plating the first two courses with the oven glowing behind.",
+          "Three tools laid out on the balcony floor, everything else crossed out.",
         voiceover:
-          "Dessert went into the oven before course one hit the table. It finishes itself while you plate like a professional.",
+          "Tools: a proper watering can, snips, and a moisture meter. Fourteen euros. Everything else is a gadget.",
       },
       {
-        headline: "Your turn",
-        body: "Full menu, human speed, zero smoke alarms. Which course still fights back? Tell me below.",
+        headline: "Total: €93, honestly",
+        body: "Under €100 including the two mistakes I'd skip today. Save this list for your first trip.",
         visualDirection:
-          "All three finished courses on the counter; slow push-in, then end card with the channel mark.",
+          "The finished balcony with a €93 tag; save prompt and channel mark.",
         voiceover:
-          "That's the whole menu at human speed. Try it this week, and tell me in the comments which course still fights back.",
+          "Ninety-three euros, honestly counted — including the two mistakes. Save the list, and tell me what you'd plant first.",
       },
     ],
   },
   {
-    signalId: "sig-question-heat-setup",
+    signalId: "sig-question-watering",
     angle:
-      "Turn the most-repeated unanswered question into a save-able reference: the exact pan, burner type, and heat level for every stage of the menu.",
+      "Turn the most-repeated unanswered question into three memorable rules: when to water, how much, and the one check that decides it.",
     caption:
-      "Finally answering the question under every video: the exact pan and heat settings I use. Swipe through, screenshot the burner map, and stop guessing why your sauce reduced to glue. Bookmark this — it applies to every recipe on the channel.",
-    cta: "Screenshot the burner map and save this post",
-    hashtags: ["#cookingtips", "#kitchenbasics", "#homecooking", "#cookware"],
-    shortDurations: [5, 6, 7, 7, 6, 5],
+      "Finally answering the question under every summer video: the exact watering schedule that kept the 2m² garden alive at 34°C. Sunrise check, two-knuckle test, measured pours. Pin this for the next heatwave and tell me what your hottest balcony day was.",
+    cta: "Pin this schedule for the next heatwave",
+    hashtags: [
+      "#balconygarden",
+      "#wateringtips",
+      "#urbangardening",
+      "#heatwave",
+    ],
+    shortDurations: [4, 6, 7, 7, 7, 5],
     scenes: [
       {
-        headline: "The most-asked question",
-        body: "'What pan? What heat?' — asked 17 times under one video. Answered once, here, for good.",
+        headline: "The 34°C week",
+        body: "One heatwave nearly took out half the balcony — until this schedule.",
         visualDirection:
-          "Slide one: bold headline over a muted photo of the stovetop; small stack of quoted comment snippets.",
+          "Thermometer graphic climbing over the balcony illustration; heat shimmer.",
         voiceover:
-          "Seventeen of you asked the same question under one video: what pan, and what heat. Here's the full answer.",
+          "This is the schedule that got the balcony through a thirty-four degree week — three rules, that's all.",
       },
       {
-        headline: "The pan",
-        body: "A 28 cm carbon-steel skillet — nothing exotic. Heavy base, flared sides, holds heat through a full sear.",
+        headline: "Water at sunrise",
+        body: "Before 8am the water soaks in instead of steaming off. Evening top-ups only on 30°C+ days.",
         visualDirection:
-          "Clean product-style photo of the skillet on a neutral background with three callout labels.",
+          "Sunrise over the railing; watering can silhouette; a clock pinned at 7:30.",
         voiceover:
-          "The pan is a twenty-eight centimeter carbon-steel skillet. Heavy base, flared sides, nothing you can't find locally.",
+          "Rule one: water at sunrise. Before eight, it soaks in. After that, you're watering the air.",
       },
       {
-        headline: "The burner map",
-        body: "Gas hob, four rings. Big ring for searing, back-left for the sauce, simmer plate for holding. Screenshot this one.",
+        headline: "The two-knuckle test",
+        body: "Finger into the soil to the second knuckle. Dry there? Water. Damp? Walk away.",
         visualDirection:
-          "Diagram slide: top-down illustration of the hob with each ring labeled by job and heat level.",
+          "Close-up of a finger in the soil with a depth marker; dry/damp split screen.",
         voiceover:
-          "Here's the burner map. Big ring sears, back-left holds the sauce, and the small ring only ever simmers.",
+          "Rule two: the two-knuckle test. Push a finger in — dry at the second knuckle means water, damp means walk away.",
       },
       {
-        headline: "Sear settings",
-        body: "High heat, two minutes of preheat, then don't touch the protein for ninety seconds. Moving it early is why it sticks.",
+        headline: "How much per pot",
+        body: "Small herb pots: half a liter. The 50cm boxes: two liters, slowly, until the saucer just shines.",
         visualDirection:
-          "Split slide: heat dial pinned at high on the left, seared crust close-up on the right.",
+          "Measuring jug pouring into each pot size with amounts labeled.",
         voiceover:
-          "For the sear: high heat, a full two-minute preheat, and then hands off for ninety seconds. Early flipping is why it sticks.",
+          "Rule three: measure it. Half a liter for the small pots, two liters for the big boxes — slowly, until the saucer shines.",
       },
       {
-        headline: "Simmer settings",
-        body: "Sauce lives at medium-low — small bubbles at the edge, never a rolling boil. Glue means the heat was too high.",
+        headline: "Shade the roots",
+        body: "A light towel over dark pots drops root temperature more than any misting.",
         visualDirection:
-          "Macro shot of gentle edge bubbles in the sauce; heat dial graphic pinned at medium-low.",
+          "Dark pot wrapped in a pale cloth; a temperature arrow dropping.",
         voiceover:
-          "The sauce never boils. Medium-low, small bubbles at the edge. If yours turned to glue, the heat was too high.",
+          "Bonus: shade the pots, not the leaves. A pale towel on a dark pot beats misting every time.",
       },
       {
-        headline: "Steal this setup",
-        body: "Same pan, same map, every recipe on the channel. Save this post — it's the answer key.",
+        headline: "Steal the schedule",
+        body: "Sunrise check, knuckle test, measured pours. Pin this for the next heatwave.",
         visualDirection:
-          "Closing slide: the full setup laid out flat-lay style with the channel mark and a save prompt.",
+          "The three rules stacked as a checklist over the watering illustration.",
         voiceover:
-          "That's the entire setup — same pan, same burner map, every recipe. Save this post; it's the answer key.",
+          "Sunrise check, knuckle test, measured pours. Steal the schedule, pin it, and your balcony survives the summer.",
       },
     ],
   },
   {
-    signalId: "sig-reaction-sauce-save",
+    signalId: "sig-reaction-what-failed",
     angle:
-      "Cut the moment the audience already marked as the highlight into a standalone rescue guide, and pilot a repeatable 'kitchen rescue' series.",
+      "Give the strongest reaction its own video: the full, honest breakdown of what died in the balcony garden and what a restart would change.",
     caption:
-      "The sauce burned, the smoke alarm went off, and the comments went wild — so here's the full rescue on its own. Six moves to bring back a burnt pan sauce without starting over. Burnt something worse? Describe the disaster below and I'll rescue it in the next one.",
-    cta: "Drop your worst kitchen disaster in the comments",
-    hashtags: ["#cookinghacks", "#kitchenfails", "#saucetok", "#cookingshorts"],
+      "You asked for the full failure list, so here it is: what died in the 2m² balcony garden, why it died, and what I'd change on a restart. Failure is data. Tell me what died on your balcony this year — honest answers only.",
+    cta: "Share your own balcony failure in the comments",
+    hashtags: [
+      "#balconygarden",
+      "#gardenfails",
+      "#growyourownfood",
+      "#lessonslearned",
+    ],
     shortDurations: [4, 6, 7, 7, 7, 6],
     scenes: [
       {
-        headline: "The moment it burned",
-        body: "Smoke alarm, black edges, dinner on the line. Thirty-one of you asked how the save worked.",
+        headline: "The part nobody shows",
+        body: "Three things died on this balcony. Here's the honest list.",
         visualDirection:
-          "Replay of the burn moment with a comment-counter overlay ticking up; hard cut to silence.",
+          "The week-six lesson note illustration; slow push-in on the pinned card.",
         voiceover:
-          "This is the moment the comments exploded. The sauce burned on camera — and thirty-one of you asked how the save worked.",
+          "Twenty-six of you reacted to one honest moment. So here's the full list — everything that died, and why.",
       },
       {
-        headline: "Stop. Don't stir.",
-        body: "Stirring drags the burnt layer through everything good. Freeze first, assess second.",
+        headline: "The spinach bolted",
+        body: "Full June sun on a south wall — the spinach quit in week five. It needed the shady corner.",
         visualDirection:
-          "Hand hovers over the pan, then pulls back. Big 'DON'T STIR' text card snaps in.",
+          "The bolted spinach illustration; a sun path arcing over the wall.",
         voiceover:
-          "Rule one: do not stir. Stirring drags the burnt layer through everything that's still good.",
+          "First loss: the spinach. Full June sun on a south wall, and by week five it bolted. Wrong plant, wrong corner.",
       },
       {
-        headline: "Off the heat",
-        body: "Kill the burner and move the pan to a cold zone. The burn stops the second the heat source is gone.",
+        headline: "Aphids took the mint",
+        body: "I ignored three sticky leaves on Monday. By Friday the pot was theirs.",
         visualDirection:
-          "Pan slides from the hot ring to a cold trivet; heat-dial graphic snaps to zero.",
+          "Close-up of aphid dots spreading across a leaf between Monday and Friday labels.",
         voiceover:
-          "Kill the burner and move the pan. The burn stops the moment it leaves the heat — every second counts here.",
+          "Second loss: the mint. Three sticky leaves on Monday, a lost pot by Friday. Check early, every time.",
       },
       {
-        headline: "The transfer trick",
-        body: "Pour the top layer into a clean pan and leave the burnt base behind. Don't scrape — gravity does the sorting.",
+        headline: "The €12 gadget I regret",
+        body: "Self-watering globes drowned the basil while I was away. A neighbor with a key beats gadgets.",
         visualDirection:
-          "Slow pour into a clean pan, camera low; the dark layer stays behind like sediment.",
+          "A watering globe with a slow drip flooding a pot; a crossed-out price tag.",
         voiceover:
-          "Now the trick: pour, don't scrape. The clean sauce comes off the top, and the burnt base stays behind.",
+          "Third loss: my own shortcut. The watering globes drowned the basil in a weekend. A neighbor with a key beats gadgets.",
       },
       {
-        headline: "Rebuild the flavor",
-        body: "A splash of stock, a knob of butter, thirty seconds of whisking. Taste — the smoke should be gone.",
+        headline: "What I'd change",
+        body: "Shade-map the balcony first, quarantine new plants, and start with half the varieties.",
         visualDirection:
-          "Butter drops into the rescued sauce; glossy whisking close-up with steam.",
+          "A simple balcony map with sun and shade zones; three checklist items.",
         voiceover:
-          "Rebuild it: a splash of stock, a knob of butter, thirty seconds of whisking. Then taste — the smoke is gone.",
+          "A restart would change three things: map the shade first, quarantine every new plant, and grow half as many varieties.",
       },
       {
-        headline: "Served, not restarted",
-        body: "Same sauce, saved in about a minute. Burnt something worse? Tell me below — I'll rescue it next.",
+        headline: "Failure is data",
+        body: "The garden that survived is built on the one that didn't. What died on your balcony? Tell me below.",
         visualDirection:
-          "Finished plate hits the table; end card invites disaster stories in the comments.",
+          "The thriving after-illustration beside the lesson note; end card.",
         voiceover:
-          "Same sauce, on the plate, saved in about a minute. Burnt something worse? Tell me below and I'll rescue it in the next one.",
+          "The garden you saw in the tour is built on this list. Failure is data — tell me what died on your balcony.",
       },
     ],
   },

@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500" role="img">
+  <title>Synthetic illustration: an empty 2 square meter balcony before the garden — bare floor, railing, and one unused pot</title>
+  <rect width="800" height="500" fill="#101411"/>
+  <!-- night sky + skyline -->
+  <circle cx="640" cy="90" r="34" fill="#f4f3ee" opacity="0.85"/>
+  <g fill="#181d19">
+    <rect x="0" y="120" width="90" height="180"/>
+    <rect x="100" y="80" width="70" height="220"/>
+    <rect x="180" y="150" width="110" height="150"/>
+    <rect x="300" y="100" width="60" height="200"/>
+    <rect x="370" y="160" width="120" height="140"/>
+    <rect x="500" y="130" width="80" height="170"/>
+    <rect x="590" y="170" width="130" height="130"/>
+    <rect x="730" y="110" width="70" height="190"/>
+  </g>
+  <g fill="#232a24">
+    <rect x="112" y="100" width="10" height="10"/><rect x="136" y="100" width="10" height="10"/>
+    <rect x="112" y="128" width="10" height="10"/><rect x="136" y="128" width="10" height="10"/>
+    <rect x="316" y="120" width="9" height="9"/><rect x="334" y="120" width="9" height="9"/>
+    <rect x="316" y="142" width="9" height="9"/>
+    <rect x="612" y="190" width="10" height="10"/><rect x="636" y="190" width="10" height="10"/>
+  </g>
+  <!-- balcony floor -->
+  <rect x="0" y="300" width="800" height="200" fill="#1b1e1a"/>
+  <g stroke="#242822" stroke-width="2">
+    <line x1="0" y1="345" x2="800" y2="345"/>
+    <line x1="0" y1="395" x2="800" y2="395"/>
+    <line x1="0" y1="450" x2="800" y2="450"/>
+    <line x1="140" y1="300" x2="80" y2="500"/>
+    <line x1="400" y1="300" x2="400" y2="500"/>
+    <line x1="660" y1="300" x2="720" y2="500"/>
+  </g>
+  <!-- railing -->
+  <g stroke="#3a4038" stroke-width="8" stroke-linecap="round">
+    <line x1="20" y1="188" x2="780" y2="188"/>
+  </g>
+  <g stroke="#2c312b" stroke-width="6">
+    <line x1="60" y1="192" x2="60" y2="320"/>
+    <line x1="150" y1="192" x2="150" y2="316"/>
+    <line x1="240" y1="192" x2="240" y2="312"/>
+    <line x1="330" y1="192" x2="330" y2="308"/>
+    <line x1="420" y1="192" x2="420" y2="308"/>
+    <line x1="510" y1="192" x2="510" y2="312"/>
+    <line x1="600" y1="192" x2="600" y2="316"/>
+    <line x1="690" y1="192" x2="690" y2="320"/>
+  </g>
+  <!-- lonely empty pot -->
+  <g>
+    <path d="M560 330 h90 l-12 62 h-66 Z" fill="#4a3f33"/>
+    <rect x="552" y="322" width="106" height="14" rx="4" fill="#5a4c3d"/>
+    <path d="M583 322 q22 -26 44 0" fill="none" stroke="#3a4038" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <!-- measuring tape hint: 2 m² -->
+  <g font-family="Georgia, serif" fill="#8b8d81">
+    <text x="52" y="470" font-size="30">2 m²</text>
+  </g>
+  <rect x="0" y="0" width="800" height="500" fill="none" stroke="#242822" stroke-width="2"/>
+</svg>

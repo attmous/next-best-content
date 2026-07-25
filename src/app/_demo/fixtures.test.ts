@@ -1,3 +1,6 @@
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,6 +10,7 @@ import {
   CONTRACT_LIMITS,
 } from "@/contracts";
 import {
+  DEMO_ASSETS,
   DEMO_SIGNAL_IDS,
   DEMO_VIDEO_URL,
   buildDemoContentPack,
@@ -32,10 +36,35 @@ describe("demo analyze fixture", () => {
     });
   });
 
-  it("targets the agreed demo video", () => {
-    expect(DEMO_VIDEO_URL).toBe("https://www.youtube.com/watch?v=sjMHLfUwWL0");
-    expect(demoAnalyzeResponse.video.id).toBe("sjMHLfUwWL0");
-    expect(demoAnalyzeResponse.video.channelTitle).toBe("ChaosAdam13");
+  it("tells the fictional Maya Makes Space case study", () => {
+    expect(demoAnalyzeResponse.video.channelTitle).toBe("Maya Makes Space");
+    expect(demoAnalyzeResponse.video.title).toBe(
+      "I Turned a 2m² Balcony Into a Food Garden",
+    );
+    expect(DEMO_VIDEO_URL).toContain("youtube.com/watch");
+  });
+
+  it("covers the three agreed signals", () => {
+    const titles = demoAnalyzeResponse.signals.map((signal) =>
+      signal.title.toLowerCase(),
+    );
+    expect(titles[0]).toContain("shopping list");
+    expect(titles[1]).toContain("watering");
+    expect(titles[2]).toContain("died");
+  });
+
+  it("contains no reference to the previous demo creator", () => {
+    // Constructed so this guard itself never matches a repo-wide sweep.
+    const formerCreator = ["ad", "am"].join("");
+    const serialized = JSON.stringify(demoAnalyzeResponse).toLowerCase();
+    expect(serialized).not.toContain(formerCreator);
+    for (const format of ["short", "carousel"] as const) {
+      for (const signalId of DEMO_SIGNAL_IDS) {
+        expect(
+          JSON.stringify(buildDemoContentPack(signalId, format)).toLowerCase(),
+        ).not.toContain(formerCreator);
+      }
+    }
   });
 
   it("carries at least two evidence previews per signal", () => {
@@ -45,6 +74,22 @@ describe("demo analyze fixture", () => {
         signal.evidence.length,
       );
     }
+  });
+});
+
+describe("demo case-study assets", () => {
+  it("ships every illustration locally with meaningful alt text", () => {
+    for (const asset of Object.values(DEMO_ASSETS)) {
+      expect(asset.src.startsWith("/demo/")).toBe(true);
+      expect(asset.alt.toLowerCase()).toContain("synthetic");
+      const filePath = join(process.cwd(), "public", asset.src);
+      expect(existsSync(filePath), asset.src).toBe(true);
+      expect(readFileSync(filePath, "utf8")).toContain("<svg");
+    }
+  });
+
+  it("keeps the fixture thumbnail non-resolving (no remote fetches)", () => {
+    expect(demoAnalyzeResponse.video.thumbnailUrl).toContain("demo.invalid");
   });
 });
 
@@ -78,6 +123,14 @@ describe("demo content packs", () => {
         true,
       );
     }
+  });
+
+  it("recommends both destinations across the three signals", () => {
+    const formats = demoAnalyzeResponse.signals.map(
+      (signal) => signal.recommendation.suggestedFormat,
+    );
+    expect(formats).toContain("short");
+    expect(formats).toContain("carousel");
   });
 
   it("produces packs usable as generate-request round trips", () => {
