@@ -36,7 +36,7 @@ describe("landing content", () => {
     expect(combined).toContain("synthetic");
     expect(combined).toContain("no account");
     expect(combined).toContain("published");
-    expect(combined).toMatch(/never entered in the browser/);
+    expect(combined).toMatch(/request-scoped keys are never stored/);
   });
 
   it("never promises reach, virality, or automatic publishing", () => {

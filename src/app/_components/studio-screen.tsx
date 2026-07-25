@@ -3,6 +3,10 @@
 import type { ContentPack, Signal } from "@/contracts";
 import type { UiError } from "@/app/_lib/errors";
 import {
+  outputGenerationState,
+  type RuntimeContext,
+} from "@/app/_lib/capabilities";
+import {
   PLATFORM_LABELS,
   availableOutputs,
   getOutput,
@@ -24,6 +28,8 @@ export function StudioScreen({
   signal,
   packs,
   outputId,
+  runtime,
+  mode,
   generating,
   generateError,
   onSwitchOutput,
@@ -36,6 +42,8 @@ export function StudioScreen({
   signal: Signal;
   packs: Partial<Record<OutputId, ContentPack>>;
   outputId: OutputId;
+  runtime: RuntimeContext;
+  mode: "live" | "demo";
   generating: boolean;
   generateError: UiError | null;
   onSwitchOutput: (outputId: OutputId) => void;
@@ -98,41 +106,47 @@ export function StudioScreen({
         </legend>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <div className="inline-flex rounded-xl border border-line bg-surface p-1">
-            {availableOutputs().map((candidate) => {
-              const isActive = candidate.id === outputId;
-              const isRecommended = candidate.id === recommendedId;
-              return (
-                <button
-                  key={candidate.id}
-                  type="button"
-                  onClick={() => onSwitchOutput(candidate.id)}
-                  aria-pressed={isActive}
-                  disabled={generating}
-                  className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
-                    isActive
-                      ? "bg-signal text-signal-ink"
-                      : "text-ink-soft hover:text-ink"
-                  }`}
-                >
-                  <PlatformIcon
-                    platform={candidate.platform}
-                    className="size-4"
-                  />
-                  {candidate.title.startsWith(
-                    PLATFORM_LABELS[candidate.platform],
-                  )
-                    ? candidate.title
-                    : `${PLATFORM_LABELS[candidate.platform]} ${candidate.title}`}
-                  {isRecommended && (
-                    <span
-                      className={`ml-2 text-[10px] uppercase tracking-wide ${isActive ? "text-signal-ink/70" : "text-signal"}`}
-                    >
-                      Recommended
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+            {availableOutputs()
+              .filter(
+                (candidate) =>
+                  outputGenerationState(candidate.id, mode, runtime)
+                    .interactive,
+              )
+              .map((candidate) => {
+                const isActive = candidate.id === outputId;
+                const isRecommended = candidate.id === recommendedId;
+                return (
+                  <button
+                    key={candidate.id}
+                    type="button"
+                    onClick={() => onSwitchOutput(candidate.id)}
+                    aria-pressed={isActive}
+                    disabled={generating}
+                    className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed ${
+                      isActive
+                        ? "bg-signal text-signal-ink"
+                        : "text-ink-soft hover:text-ink"
+                    }`}
+                  >
+                    <PlatformIcon
+                      platform={candidate.platform}
+                      className="size-4"
+                    />
+                    {candidate.title.startsWith(
+                      PLATFORM_LABELS[candidate.platform],
+                    )
+                      ? candidate.title
+                      : `${PLATFORM_LABELS[candidate.platform]} ${candidate.title}`}
+                    {isRecommended && (
+                      <span
+                        className={`ml-2 text-[10px] uppercase tracking-wide ${isActive ? "text-signal-ink/70" : "text-signal"}`}
+                      >
+                        Recommended
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
           </div>
           <Button variant="ghost" onClick={onChangeDestination}>
             All destinations…

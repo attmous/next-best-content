@@ -272,8 +272,10 @@ export function LandingScreen({
           </h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
             The complete product — live YouTube analysis, comment imports, and
-            generation — runs on your machine. Your model key is configured
-            through the container environment and never touches the browser.
+            generation — runs on your machine. The recommended setup keeps
+            your model key in the container environment. If the operator
+            enables request-scoped keys, they stay in memory for one run and
+            are never stored.
           </p>
           <ol className="mt-4 flex flex-col gap-1.5 text-sm text-ink-soft">
             <li>

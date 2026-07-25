@@ -17,6 +17,7 @@ import { toUiError, type UiError } from "@/app/_lib/errors";
 import {
   PUBLIC_RUNTIME,
   fetchRuntimeContext,
+  outputGenerationState,
   type RuntimeContext,
 } from "@/app/_lib/capabilities";
 import {
@@ -85,6 +86,8 @@ interface AnalysisRun {
   url: string;
   analyzeSource: AnalyzeSource;
   descriptor: SourceDescriptor;
+  /** Request-scoped only: held in memory for this run and never persisted. */
+  modelApiKey?: string;
 }
 
 export function App() {
@@ -147,6 +150,9 @@ export function App() {
       client.analyze({
         youtubeUrl: nextRun.url,
         source: nextRun.analyzeSource,
+        ...(nextRun.modelApiKey === undefined
+          ? {}
+          : { modelApiKey: nextRun.modelApiKey }),
       }),
       sleep(MIN_ANALYSIS_MS),
     ]);
@@ -162,16 +168,20 @@ export function App() {
     }
   }
 
-  function analyzeYoutube(url: string) {
+  function analyzeYoutube(url: string, modelApiKey?: string) {
     void startAnalyze({
       mode: "live",
       url,
       analyzeSource: { type: "youtube" },
       descriptor: { mode: "live", platform: "youtube", url },
+      ...(modelApiKey === undefined ? {} : { modelApiKey }),
     });
   }
 
-  function analyzeImport(submission: ImportSubmission) {
+  function analyzeImport(
+    submission: ImportSubmission,
+    modelApiKey?: string,
+  ) {
     void startAnalyze({
       mode: "live",
       url: submission.sourceUrl,
@@ -183,6 +193,7 @@ export function App() {
         fileName: submission.fileName,
         importedCommentCount: submission.comments.length,
       },
+      ...(modelApiKey === undefined ? {} : { modelApiKey }),
     });
   }
 
@@ -211,7 +222,13 @@ export function App() {
     if (!analysis || !run) return;
     const signal = analysis.signals.find((item) => item.id === id);
     const format = getOutput(output).contractFormat;
-    if (!signal || !format) return;
+    if (
+      !signal ||
+      !format ||
+      !outputGenerationState(output, run.mode, runtime).interactive
+    ) {
+      return;
+    }
 
     const runId = runRef.current;
     setGenerating(true);
@@ -222,6 +239,9 @@ export function App() {
         signal,
         format,
         provenance: analysis.provenance,
+        ...(run.modelApiKey === undefined
+          ? {}
+          : { modelApiKey: run.modelApiKey }),
       });
       if (runId !== runRef.current) return;
       setPacks((previous) => ({ ...previous, [output]: pack }));
@@ -234,7 +254,13 @@ export function App() {
   }
 
   function selectOutput(output: OutputId) {
-    if (getOutput(output).availability !== "available") return;
+    if (
+      !run ||
+      getOutput(output).availability !== "available" ||
+      !outputGenerationState(output, run.mode, runtime).interactive
+    ) {
+      return;
+    }
     setOutputId(output);
     setPreflightResult(null);
     setStage("studio");
@@ -244,7 +270,13 @@ export function App() {
   }
 
   function switchOutputInStudio(output: OutputId) {
-    if (getOutput(output).availability !== "available") return;
+    if (
+      !run ||
+      getOutput(output).availability !== "available" ||
+      !outputGenerationState(output, run.mode, runtime).interactive
+    ) {
+      return;
+    }
     setOutputId(output);
     setPreflightResult(null);
     if (!packs[output] && signalId) {
@@ -306,7 +338,9 @@ export function App() {
           <div className="flex items-center gap-3">
             {runtime.profile === "self_hosted" && (
               <span className="rounded-full border border-line-strong px-3 py-1 text-xs font-medium text-ink-soft">
-                Private self-hosted install
+                {runtime.capabilities?.installation === "private"
+                  ? "Private self-hosted install"
+                  : "Self-hosted install"}
               </span>
             )}
             {stage !== "start" &&
@@ -380,6 +414,8 @@ export function App() {
         {stage === "destination" && selectedSignal && (
           <DestinationScreen
             signal={selectedSignal}
+            runtime={runtime}
+            mode={run?.mode ?? "demo"}
             onSelect={selectOutput}
             onBack={() => setStage("signals")}
           />
@@ -390,6 +426,8 @@ export function App() {
             signal={selectedSignal}
             packs={packs}
             outputId={outputId}
+            runtime={runtime}
+            mode={run?.mode ?? "demo"}
             generating={generating}
             generateError={generateError}
             onSwitchOutput={switchOutputInStudio}

@@ -32,6 +32,6 @@ export const TRUST_POINTS = [
   {
     title: "Private by default",
     detail:
-      "The full product runs on your own machine with your own model key, configured in the container environment — never entered in the browser.",
+      "The full product runs on your machine. The recommended key path is server-managed container configuration; optional request-scoped keys are never stored.",
   },
 ] as const;

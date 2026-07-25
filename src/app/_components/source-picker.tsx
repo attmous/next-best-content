@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent, type ReactNode } from "react";
 
 import { parseYoutubeUrl } from "@/app/_lib/youtube";
 import {
+  allowsRequestScopedModelKey,
   sourceOptionState,
   type RuntimeContext,
 } from "@/app/_lib/capabilities";
@@ -56,28 +57,41 @@ export function SourcePicker({
 }: {
   runtime: RuntimeContext;
   initialOpenId?: SourceOptionId | null;
-  onAnalyzeYoutube: (normalizedUrl: string) => void;
-  onImport: (submission: ImportSubmission) => void;
+  onAnalyzeYoutube: (normalizedUrl: string, modelApiKey?: string) => void;
+  onImport: (submission: ImportSubmission, modelApiKey?: string) => void;
   onDemo: () => void;
 }) {
+  const keyInputId = useId();
   const [openId, setOpenId] = useState<SourceOptionId | null>(initialOpenId);
   const [importPlatform, setImportPlatform] =
     useState<SourcePlatformTag>("youtube");
+  const [modelApiKey, setModelApiKey] = useState("");
+  const requestScopedKeyAllowed = allowsRequestScopedModelKey(runtime);
   const importInteractive = sourceOptionState(
     SOURCE_OPTIONS.find((option) => option.id === "import")!,
     runtime,
   ).interactive;
 
+  function requestScopedKey(): string | undefined {
+    if (!requestScopedKeyAllowed) return undefined;
+    const trimmed = modelApiKey.trim();
+    return trimmed.length === 0 ? undefined : trimmed;
+  }
+
   function panelFor(option: SourceOption): ReactNode {
     switch (option.id) {
       case "youtube-live":
-        return <YoutubeUrlPanel onSubmit={onAnalyzeYoutube} />;
+        return (
+          <YoutubeUrlPanel
+            onSubmit={(url) => onAnalyzeYoutube(url, requestScopedKey())}
+          />
+        );
       case "import":
         return (
           <ImportForm
             key={importPlatform}
             initialPlatform={importPlatform}
-            onSubmit={onImport}
+            onSubmit={(submission) => onImport(submission, requestScopedKey())}
             submitting={false}
           />
         );
@@ -122,6 +136,32 @@ export function SourcePicker({
       <h2 className="font-display text-xl font-bold text-ink">
         Where should we find the audience signal?
       </h2>
+      {requestScopedKeyAllowed && (
+        <div className="mt-4 rounded-2xl border border-line bg-surface px-5 py-4">
+          <label
+            htmlFor={keyInputId}
+            className="block text-sm font-semibold text-ink"
+          >
+            Request-scoped OpenAI API key{" "}
+            <span className="font-normal text-ink-faint">(optional)</span>
+          </label>
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-ink-faint">
+            Used only for this run and sent to this self-hosted API. It is
+            never saved, cached, logged, returned, or placed in a URL. Leave
+            it blank to use a server-managed container key when configured.
+          </p>
+          <input
+            id={keyInputId}
+            type="password"
+            autoComplete="off"
+            spellCheck={false}
+            value={modelApiKey}
+            onChange={(event) => setModelApiKey(event.target.value)}
+            placeholder="sk-…"
+            className="mt-3 w-full rounded-xl border border-line-strong bg-surface-raised px-4 py-2.5 font-mono text-sm text-ink placeholder:text-ink-faint"
+          />
+        </div>
+      )}
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
         {SOURCE_OPTIONS.map((option) => {
           const state = sourceOptionState(option, runtime);
