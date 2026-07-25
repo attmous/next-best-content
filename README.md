@@ -1,0 +1,126 @@
+# NextBestContent by Tripods
+
+> From audience signals to publish-ready content.
+
+NextBestContent helps creators answer: **Based on what my audience is saying,
+what should I create next?** The MVP is designed to turn creator-provided
+comments into three evidence-backed opportunities, generate a six-scene Short
+or six-slide carousel, and run a transparent preflight check.
+
+## Current status
+
+This repository is the public, contract-first hackathon base. It is intentionally
+non-functional while parallel implementation streams build against one shared
+schema. The three core routes currently return `501 Not Implemented`; they must
+not be treated as a working API or connected to paid production credentials.
+
+| Route | Intended responsibility | Base behavior |
+| --- | --- | --- |
+| `POST /api/analyze` | Normalize a source and return exactly three evidence-backed signals | `501` |
+| `POST /api/generate` | Turn one signal into exactly six Short scenes or carousel slides | `501` |
+| `POST /api/preflight` | Apply deterministic quality and safety checks to a content pack | `501` |
+
+## Source modes
+
+All outputs will carry provenance. Synthetic data must be visibly identified
+and must never silently replace creator-provided or live data.
+
+| Source | MVP intent | Status |
+| --- | --- | --- |
+| Creator import | Validate up to 100 comments supplied as JSON or CSV by a creator who has the right to use them | Planned |
+| Synthetic demo | Reproduce the full flow with clearly labeled, fictional fixture data | Planned |
+| YouTube Data API | Read video metadata and top-level comments through an isolated adapter | Scaffolded, disabled by default |
+
+The YouTube adapter may be enabled only when both `ENABLE_YOUTUBE_API=true` and
+`YOUTUBE_POLICY_APPROVED=true`, after the project owner explicitly confirms the
+use case and implementation comply with the current
+[YouTube API Services Developer Policies](https://developers.google.com/youtube/terms/developer-policies?hl=en),
+including any required amendment or audit. This project does not scrape
+YouTube.
+
+## Model-key handling
+
+The planned model adapter uses an OpenAI-compatible HTTP API. A caller may
+supply a BYOK credential for one request; the server must not persist, cache,
+log, or return that key, and model routes must use `Cache-Control: no-store`.
+A server-owned `LLM_API_KEY` is ignored unless
+`ENABLE_SERVER_LLM_KEY=true`. Operators remain responsible for deployment
+access controls, abuse protection, and provider terms.
+
+## Local setup
+
+Next.js 16 requires Node.js 20.9 or newer.
+
+```bash
+npm ci
+# Copy .env.example to .env.local; the base works with every feature flag off.
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the local Next.js development server |
+| `npm run lint` | Run the repository lint checks |
+| `npm run typecheck` | Validate TypeScript without emitting files |
+| `npm run test` | Run the Vitest contract and route tests once |
+| `npm run build` | Create a production build and run framework/type validation |
+| `npm run check` | Run lint, type-check, tests, and production build |
+| `npm run start` | Serve a completed production build |
+
+### Environment
+
+Secrets stay blank in `.env.example` and belong only in `.env.local` or the
+deployment secret store.
+
+| Variable | Example default | Purpose |
+| --- | --- | --- |
+| `LLM_PROVIDER` | `openai-compatible` | Select the isolated model provider |
+| `LLM_MODEL` | blank | Provider model identifier |
+| `LLM_BASE_URL` | blank | OpenAI-compatible API base URL |
+| `ENABLE_SERVER_LLM_KEY` | `false` | Permit use of the server-owned model key |
+| `LLM_API_KEY` | blank | Optional server-owned model key |
+| `ENABLE_YOUTUBE_API` | `false` | First live YouTube source gate |
+| `YOUTUBE_POLICY_APPROVED` | `false` | Required explicit policy-approval gate |
+| `YOUTUBE_API_KEY` | blank | YouTube Data API credential |
+| `ENABLE_N8N` | `false` | Enable the optional n8n handoff |
+| `N8N_WEBHOOK_URL` | blank | n8n rendering webhook |
+| `N8N_WEBHOOK_SECRET` | blank | Secret used to authenticate the handoff |
+| `ENABLE_ELEVENLABS` | `false` | Enable optional narration |
+| `ELEVENLABS_API_KEY` | blank | ElevenLabs credential |
+| `ELEVENLABS_VOICE_ID` | blank | Narration voice identifier |
+| `ELEVENLABS_MODEL_ID` | `eleven_multilingual_v2` | Narration model identifier |
+| `ENABLE_FAL` | `false` | Enable optional fal media generation |
+| `FAL_KEY` | blank | fal credential |
+
+## Architecture and parallel work
+
+- `src/contracts/` is the Zod-backed source of truth for public requests,
+  responses, errors, and provenance.
+- `src/server/` owns use-case logic, policy gates, providers, and optional
+  integration adapters.
+- `src/app/api/` contains thin App Router handlers; the remaining `src/app/`
+  owns the web experience.
+- The MVP is stateless: no authentication, database, or permanent history.
+
+`main` is the green integration baseline. Parallel streams branch from the same
+baseline into separate worktrees (`contracts`, `server-api`, and
+`frontend-integration`), stay inside their ownership boundaries, and merge
+through reviewed pull requests only after relevant tests, lint, and build
+checks pass. Changes to shared contracts, package files, or the lockfile require
+coordination before editing.
+
+## Out of scope
+
+Authentication, permanent history, LinkedIn ingestion, social publishing,
+teams, billing, a general autonomous agent, YouTube scraping, and guaranteed
+MP4 rendering are outside this hackathon base. Optional n8n, ElevenLabs, and
+fal integrations must degrade to the storyboard or carousel rather than break
+the core journey.
+
+## License
+
+[MIT](LICENSE) (c) 2026 Moustafa Attia.

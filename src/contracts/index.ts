@@ -1,0 +1,303 @@
+import { z } from "zod";
+
+export const CONTRACT_LIMITS = {
+  url: 2_048,
+  apiKey: 4_096,
+  comments: 100,
+  signals: 3,
+  scenes: 6,
+  preflightScenes: 12,
+} as const;
+
+const IdentifierSchema = z.string().trim().min(1).max(128);
+const ShortTextSchema = z.string().trim().min(1).max(500);
+const LongTextSchema = z.string().trim().min(1).max(5_000);
+const UrlSchema = z.string().url().max(CONTRACT_LIMITS.url);
+const ScoreSchema = z.number().int().min(0).max(100);
+const ModelApiKeySchema = z
+  .string()
+  .min(1)
+  .max(CONTRACT_LIMITS.apiKey)
+  .refine((value) => value.trim().length > 0, "API key cannot be blank");
+
+export const ContentFormatSchema = z.enum(["short", "carousel"]);
+export type ContentFormat = z.infer<typeof ContentFormatSchema>;
+
+export const VideoMetadataSchema = z.strictObject({
+  id: IdentifierSchema,
+  title: ShortTextSchema,
+  channelTitle: ShortTextSchema,
+  thumbnailUrl: UrlSchema,
+  commentCount: z.number().int().nonnegative().optional(),
+});
+export type VideoMetadata = z.infer<typeof VideoMetadataSchema>;
+
+export const EvidenceSchema = z.strictObject({
+  author: ShortTextSchema,
+  text: LongTextSchema,
+  likeCount: z.number().int().nonnegative(),
+});
+export type Evidence = z.infer<typeof EvidenceSchema>;
+
+export const RecommendationSchema = z.strictObject({
+  workingTitle: ShortTextSchema,
+  hook: LongTextSchema,
+  suggestedFormat: ContentFormatSchema,
+  rationale: LongTextSchema,
+});
+export type Recommendation = z.infer<typeof RecommendationSchema>;
+
+export const SignalCategorySchema = z.enum([
+  "request",
+  "unanswered_question",
+  "strong_reaction",
+]);
+export type SignalCategory = z.infer<typeof SignalCategorySchema>;
+
+export const SignalSchema = z.strictObject({
+  id: IdentifierSchema,
+  category: SignalCategorySchema,
+  title: ShortTextSchema,
+  summary: LongTextSchema,
+  opportunityScore: ScoreSchema,
+  scoreReasons: z.array(ShortTextSchema).max(10),
+  evidenceCount: z.number().int().nonnegative(),
+  evidence: z.array(EvidenceSchema).min(1).max(CONTRACT_LIMITS.comments),
+  recommendation: RecommendationSchema,
+});
+export type Signal = z.infer<typeof SignalSchema>;
+
+const YoutubeProvenanceSchema = z.strictObject({
+  source: z.literal("youtube"),
+  evidence: z.literal("live"),
+});
+
+const ImportProvenanceSchema = z.strictObject({
+  source: z.literal("import"),
+  evidence: z.literal("creator_supplied"),
+});
+
+const DemoProvenanceSchema = z.strictObject({
+  source: z.literal("demo"),
+  evidence: z.literal("synthetic"),
+  fixtureId: IdentifierSchema,
+});
+
+const UnknownProvenanceSchema = z.strictObject({
+  source: z.literal("unknown"),
+  evidence: z.literal("unknown"),
+});
+
+export const ProvenanceSchema = z.discriminatedUnion("source", [
+  YoutubeProvenanceSchema,
+  ImportProvenanceSchema,
+  DemoProvenanceSchema,
+  UnknownProvenanceSchema,
+]);
+export type Provenance = z.infer<typeof ProvenanceSchema>;
+
+const YoutubeAnalyzeSourceSchema = z.strictObject({
+  type: z.literal("youtube"),
+});
+
+const ImportAnalyzeSourceSchema = z.strictObject({
+  type: z.literal("import"),
+  comments: z.array(EvidenceSchema).max(CONTRACT_LIMITS.comments),
+  video: VideoMetadataSchema.optional(),
+});
+
+const DemoAnalyzeSourceSchema = z.strictObject({
+  type: z.literal("demo"),
+});
+
+export const AnalyzeSourceSchema = z.discriminatedUnion("type", [
+  YoutubeAnalyzeSourceSchema,
+  ImportAnalyzeSourceSchema,
+  DemoAnalyzeSourceSchema,
+]);
+export type AnalyzeSource = z.infer<typeof AnalyzeSourceSchema>;
+
+export const AnalyzeRequestSchema = z.strictObject({
+  youtubeUrl: UrlSchema,
+  modelApiKey: ModelApiKeySchema.optional(),
+  source: AnalyzeSourceSchema,
+});
+export type AnalyzeRequest = z.infer<typeof AnalyzeRequestSchema>;
+
+export const AnalyzeResponseSchema = z.strictObject({
+  video: VideoMetadataSchema,
+  signals: z.array(SignalSchema).length(CONTRACT_LIMITS.signals),
+  provenance: ProvenanceSchema,
+});
+export type AnalyzeResponse = z.infer<typeof AnalyzeResponseSchema>;
+
+export const GenerateRequestSchema = z.strictObject({
+  video: VideoMetadataSchema,
+  signal: SignalSchema,
+  format: ContentFormatSchema,
+  modelApiKey: ModelApiKeySchema.optional(),
+  provenance: ProvenanceSchema.optional(),
+});
+export type GenerateRequest = z.infer<typeof GenerateRequestSchema>;
+
+export const SceneSchema = z.strictObject({
+  index: z.number().int().nonnegative(),
+  headline: ShortTextSchema,
+  body: LongTextSchema,
+  visualDirection: LongTextSchema,
+  voiceover: LongTextSchema,
+  durationSeconds: z.number().finite().nonnegative().max(45),
+});
+export type Scene = z.infer<typeof SceneSchema>;
+
+export const ContentPackSchema = z
+  .strictObject({
+    id: IdentifierSchema,
+    format: ContentFormatSchema,
+    title: ShortTextSchema,
+    hook: LongTextSchema,
+    angle: LongTextSchema,
+    scenes: z.array(SceneSchema).length(CONTRACT_LIMITS.scenes),
+    caption: LongTextSchema,
+    cta: ShortTextSchema,
+    hashtags: z.array(ShortTextSchema).max(30),
+    sourceEvidence: z
+      .array(EvidenceSchema)
+      .min(1)
+      .max(CONTRACT_LIMITS.comments),
+    sourceSignal: SignalSchema,
+    provenance: ProvenanceSchema,
+  })
+  .superRefine((contentPack, context) => {
+    if (contentPack.format === "short") {
+      const totalDuration = contentPack.scenes.reduce(
+        (total, scene) => total + scene.durationSeconds,
+        0,
+      );
+
+      if (totalDuration < 30 || totalDuration > 45) {
+        context.addIssue({
+          code: "custom",
+          message: "Short scenes must total between 30 and 45 seconds",
+          path: ["scenes"],
+        });
+      }
+    }
+
+    if (
+      contentPack.format === "carousel" &&
+      contentPack.scenes.some((scene) => scene.durationSeconds !== 0)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Carousel scene durations must be 0",
+        path: ["scenes"],
+      });
+    }
+  });
+export type ContentPack = z.infer<typeof ContentPackSchema>;
+
+const DraftTextSchema = z.string().max(5_000);
+
+export const PreflightDraftSceneSchema = z.strictObject({
+  index: z.number().int().min(0).max(100),
+  headline: DraftTextSchema,
+  body: DraftTextSchema,
+  visualDirection: DraftTextSchema,
+  voiceover: DraftTextSchema,
+  durationSeconds: z.number().finite().min(0).max(300),
+});
+export type PreflightDraftScene = z.infer<
+  typeof PreflightDraftSceneSchema
+>;
+
+export const PreflightDraftContentPackSchema = z.strictObject({
+  id: IdentifierSchema.optional(),
+  format: ContentFormatSchema,
+  title: DraftTextSchema,
+  hook: DraftTextSchema,
+  angle: DraftTextSchema,
+  scenes: z
+    .array(PreflightDraftSceneSchema)
+    .max(CONTRACT_LIMITS.preflightScenes),
+  caption: DraftTextSchema,
+  cta: DraftTextSchema,
+  hashtags: z.array(DraftTextSchema).max(30),
+  sourceEvidence: z
+    .array(EvidenceSchema)
+    .max(CONTRACT_LIMITS.comments)
+    .optional(),
+  sourceSignal: SignalSchema.optional(),
+  provenance: ProvenanceSchema.optional(),
+});
+export type PreflightDraftContentPack = z.infer<
+  typeof PreflightDraftContentPackSchema
+>;
+
+export const PreflightRequestSchema = z.strictObject({
+  contentPack: PreflightDraftContentPackSchema,
+});
+export type PreflightRequest = z.infer<typeof PreflightRequestSchema>;
+
+export const PreflightCheckNameSchema = z.enum([
+  "hook",
+  "audience_fit",
+  "evidence",
+  "clarity",
+  "format",
+  "cta",
+  "brand_safety",
+]);
+export type PreflightCheckName = z.infer<typeof PreflightCheckNameSchema>;
+
+export const PreflightCheckStatusSchema = z.enum([
+  "pass",
+  "warning",
+  "fail",
+]);
+export type PreflightCheckStatus = z.infer<
+  typeof PreflightCheckStatusSchema
+>;
+
+export const PreflightCheckSchema = z.strictObject({
+  name: PreflightCheckNameSchema,
+  score: ScoreSchema,
+  status: PreflightCheckStatusSchema,
+  explanation: LongTextSchema,
+  suggestedFix: LongTextSchema.optional(),
+});
+export type PreflightCheck = z.infer<typeof PreflightCheckSchema>;
+
+export const PreflightResponseSchema = z.strictObject({
+  overallScore: ScoreSchema,
+  verdict: z.enum(["ready", "needs_changes", "blocked"]),
+  checks: z.array(PreflightCheckSchema).max(7),
+  blockingIssues: z.array(LongTextSchema).max(20),
+});
+export type PreflightResponse = z.infer<typeof PreflightResponseSchema>;
+
+export const ApiErrorCodeSchema = z.enum([
+  "VALIDATION_ERROR",
+  "INVALID_YOUTUBE_URL",
+  "COMMENTS_DISABLED",
+  "TOO_FEW_COMMENTS",
+  "YOUTUBE_QUOTA_EXCEEDED",
+  "MODEL_AUTHENTICATION_FAILED",
+  "INVALID_MODEL_OUTPUT",
+  "EXTERNAL_SERVICE_TIMEOUT",
+  "FEATURE_DISABLED",
+  "NOT_IMPLEMENTED",
+  "INTERNAL_ERROR",
+]);
+export type ApiErrorCode = z.infer<typeof ApiErrorCodeSchema>;
+
+export const ApiErrorResponseSchema = z.strictObject({
+  error: z.strictObject({
+    code: ApiErrorCodeSchema,
+    message: LongTextSchema,
+    retryable: z.boolean(),
+    requestId: IdentifierSchema,
+    details: z.record(z.string(), z.unknown()).optional(),
+  }),
+});
+export type ApiErrorResponse = z.infer<typeof ApiErrorResponseSchema>;
