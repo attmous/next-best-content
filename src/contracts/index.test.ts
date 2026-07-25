@@ -4,8 +4,14 @@ import {
   AnalyzeRequestSchema,
   AnalyzeResponseSchema,
   ApiErrorResponseSchema,
+  CapabilitiesResponseSchema,
   ContentPackSchema,
+  ContentTargetSchema,
+  GenerateRequestSchema,
+  IMPORT_THUMBNAIL_PLACEHOLDER,
   PreflightRequestSchema,
+  SourceAssetSchema,
+  SourcePlatformSchema,
 } from "./index";
 
 const video = {
@@ -20,6 +26,17 @@ const evidence = {
   author: "Viewer",
   text: "Could you show the process step by step?",
   likeCount: 8,
+};
+
+const sourceAsset = {
+  platform: "linkedin" as const,
+  kind: "post" as const,
+  id: "urn:li:activity:123",
+  title: "A creator workflow post",
+  creatorName: "Example Creator",
+  thumbnailUrl: "https://example.com/workflow-thumbnail.jpg",
+  canonicalUrl: "https://www.linkedin.com/posts/example-creator_workflow-123",
+  sampledCommentCount: 1,
 };
 
 const signal = (id: string) => ({
@@ -67,45 +84,103 @@ const contentPack = {
 };
 
 describe("AnalyzeRequestSchema", () => {
-  it("accepts live, imported, and demo sources while preserving the base request", () => {
+  it("requires a YouTube URL only for live YouTube sources", () => {
+    expect(
+      AnalyzeRequestSchema.safeParse({
+        youtubeUrl: "https://www.youtube.com/watch?v=sjMHLfUwWL0",
+        source: { type: "youtube" },
+      }).success,
+    ).toBe(true);
+    expect(
+      AnalyzeRequestSchema.safeParse({
+        source: { type: "youtube" },
+      }).success,
+    ).toBe(false);
+    expect(
+      AnalyzeRequestSchema.safeParse({
+        youtubeUrl: "not-a-url",
+        source: { type: "youtube" },
+      }).success,
+    ).toBe(false);
+    expect(
+      AnalyzeRequestSchema.safeParse({
+        modelApiKey: "request-scoped-key",
+        source: {
+          type: "import",
+          platform: "linkedin",
+          rightsConfirmed: true,
+          comments: [evidence],
+          video,
+          sourceAsset,
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      AnalyzeRequestSchema.safeParse({
+        source: { type: "demo" },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("requires imports to identify their platform and confirm usage rights", () => {
+    const validImport = {
+      source: {
+        type: "import" as const,
+        platform: "other" as const,
+        rightsConfirmed: true as const,
+        comments: [evidence],
+      },
+    };
+
+    expect(AnalyzeRequestSchema.safeParse(validImport).success).toBe(true);
+    expect(
+      AnalyzeRequestSchema.safeParse({
+        source: {
+          type: "import",
+          rightsConfirmed: true,
+          comments: [evidence],
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      AnalyzeRequestSchema.safeParse({
+        source: {
+          type: "import",
+          platform: "linkedin",
+          rightsConfirmed: false,
+          comments: [evidence],
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      AnalyzeRequestSchema.safeParse({
+        source: {
+          type: "import",
+          platform: "linkedin",
+          comments: [evidence],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects unknown request fields and more than 100 imported comments", () => {
     const base = {
       youtubeUrl: "https://www.youtube.com/watch?v=sjMHLfUwWL0",
-      modelApiKey: "request-scoped-key",
     };
 
     expect(
       AnalyzeRequestSchema.safeParse({
         ...base,
         source: { type: "youtube" },
-      }).success,
-    ).toBe(true);
-    expect(
-      AnalyzeRequestSchema.safeParse({
-        ...base,
-        source: { type: "import", comments: [evidence], video },
-      }).success,
-    ).toBe(true);
-    expect(
-      AnalyzeRequestSchema.safeParse({
-        ...base,
-        source: { type: "demo" },
-      }).success,
-    ).toBe(true);
-  });
-
-  it("rejects unknown request fields and more than 100 imported comments", () => {
-    expect(
-      AnalyzeRequestSchema.safeParse({
-        youtubeUrl: "https://www.youtube.com/watch?v=sjMHLfUwWL0",
-        source: { type: "youtube" },
         unexpected: true,
       }).success,
     ).toBe(false);
     expect(
       AnalyzeRequestSchema.safeParse({
-        youtubeUrl: "https://www.youtube.com/watch?v=sjMHLfUwWL0",
         source: {
           type: "import",
+          platform: "other",
+          rightsConfirmed: true,
           comments: Array.from({ length: 101 }, () => evidence),
         },
       }).success,
@@ -126,6 +201,30 @@ describe("AnalyzeResponseSchema", () => {
       AnalyzeResponseSchema.safeParse({
         ...response,
         signals: response.signals.slice(0, 2),
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts optional source context and requires a platform on import provenance", () => {
+    const response = {
+      video,
+      signals: [signal("one"), signal("two"), signal("three")],
+      provenance: {
+        source: "import",
+        evidence: "creator_supplied",
+        platform: "linkedin",
+      },
+      sourceAsset,
+    };
+
+    expect(AnalyzeResponseSchema.safeParse(response).success).toBe(true);
+    expect(
+      AnalyzeResponseSchema.safeParse({
+        ...response,
+        provenance: {
+          source: "import",
+          evidence: "creator_supplied",
+        },
       }).success,
     ).toBe(false);
   });
@@ -153,8 +252,25 @@ describe("AnalyzeResponseSchema", () => {
 });
 
 describe("ContentPackSchema", () => {
-  it("accepts a six-scene Short totaling 30 to 45 seconds", () => {
+  it("keeps existing six-scene packs valid without platform metadata", () => {
     expect(ContentPackSchema.safeParse(contentPack).success).toBe(true);
+  });
+
+  it("accepts additive source context and target metadata", () => {
+    expect(
+      ContentPackSchema.safeParse({
+        ...contentPack,
+        sourceAsset: {
+          ...sourceAsset,
+          platform: "youtube",
+          kind: "video",
+        },
+        target: {
+          platform: "youtube",
+          output: "short",
+        },
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects the wrong scene count and out-of-range Short timing", () => {
@@ -186,6 +302,177 @@ describe("ContentPackSchema", () => {
         scenes: carousel.scenes.map((item, index) =>
           index === 0 ? { ...item, durationSeconds: 1 } : item,
         ),
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("platform-neutral source and target schemas", () => {
+  it("accepts the supported source platforms and rejects unknown ones", () => {
+    for (const platform of ["youtube", "linkedin", "other"]) {
+      expect(SourcePlatformSchema.safeParse(platform).success).toBe(true);
+    }
+    expect(SourcePlatformSchema.safeParse("tiktok").success).toBe(false);
+  });
+
+  it("accepts bounded source context and preserves strict object validation", () => {
+    expect(SourceAssetSchema.safeParse(sourceAsset).success).toBe(true);
+    expect(
+      SourceAssetSchema.safeParse({
+        ...sourceAsset,
+        sampledCommentCount: 101,
+      }).success,
+    ).toBe(false);
+    expect(
+      SourceAssetSchema.safeParse({
+        ...sourceAsset,
+        unexpected: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      SourceAssetSchema.safeParse({
+        ...sourceAsset,
+        canonicalUrl: "javascript:alert(1)",
+      }).success,
+    ).toBe(false);
+    expect(
+      SourceAssetSchema.safeParse({
+        ...sourceAsset,
+        canonicalUrl: "not-a-url",
+      }).success,
+    ).toBe(false);
+    expect(
+      SourceAssetSchema.safeParse({
+        ...sourceAsset,
+        thumbnailUrl: "data:image/svg+xml,<svg></svg>",
+      }).success,
+    ).toBe(false);
+    expect(
+      SourceAssetSchema.safeParse({
+        ...sourceAsset,
+        thumbnailUrl: IMPORT_THUMBNAIL_PLACEHOLDER,
+      }).success,
+    ).toBe(true);
+  });
+
+  it("accepts only the supported platform and output target pairs", () => {
+    expect(
+      ContentTargetSchema.safeParse({
+        platform: "youtube",
+        output: "short",
+      }).success,
+    ).toBe(true);
+    expect(
+      ContentTargetSchema.safeParse({
+        platform: "linkedin",
+        output: "document",
+      }).success,
+    ).toBe(true);
+    expect(
+      ContentTargetSchema.safeParse({
+        platform: "linkedin",
+        output: "short",
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts additive context and target metadata on generation requests", () => {
+    expect(
+      GenerateRequestSchema.safeParse({
+        video,
+        signal: signal("signal-1"),
+        format: "carousel",
+        provenance: {
+          source: "import",
+          evidence: "creator_supplied",
+          platform: "linkedin",
+        },
+        sourceAsset,
+        target: {
+          platform: "linkedin",
+          output: "document",
+        },
+      }).success,
+    ).toBe(true);
+    expect(
+      GenerateRequestSchema.safeParse({
+        video,
+        signal: signal("signal-1"),
+        format: "short",
+        target: {
+          platform: "linkedin",
+          output: "document",
+        },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe("CapabilitiesResponseSchema", () => {
+  const capabilities = {
+    openaiCredentials: {
+      serverManaged: true,
+      requestScoped: false,
+    },
+    availability: {
+      openai: { available: true, reason: "enabled" },
+      import: { available: true, reason: "enabled" },
+      youtubeLive: {
+        available: false,
+        reason: "policy_approval_required",
+      },
+      linkedinImport: { available: true, reason: "enabled" },
+      linkedinDirectRead: {
+        available: false,
+        reason: "access_not_available",
+      },
+      youtubeShort: { available: false, reason: "configuration_missing" },
+      linkedinDocument: { available: false, reason: "not_implemented" },
+      linkedinPublish: { available: false, reason: "not_implemented" },
+    },
+  } as const;
+
+  it("requires all declared availability entries", () => {
+    expect(CapabilitiesResponseSchema.safeParse(capabilities).success).toBe(
+      true,
+    );
+
+    const incompleteAvailability = Object.fromEntries(
+      Object.entries(capabilities.availability).filter(
+        ([name]) => name !== "linkedinPublish",
+      ),
+    );
+
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        availability: incompleteAvailability,
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects unknown capability reasons and entries", () => {
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        availability: {
+          ...capabilities.availability,
+          openai: { available: false, reason: "temporarily_unavailable" },
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        availability: {
+          ...capabilities.availability,
+          extraProvider: { available: true },
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("requires explicit server-managed and request-scoped credential modes", () => {
+    expect(
+      CapabilitiesResponseSchema.safeParse({
+        availability: capabilities.availability,
       }).success,
     ).toBe(false);
   });
@@ -225,6 +512,44 @@ describe("PreflightRequestSchema", () => {
           caption: "",
           cta: "",
           hashtags: [],
+        },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("accepts the platform metadata returned by live generation", () => {
+    expect(
+      PreflightRequestSchema.safeParse({
+        contentPack: {
+          ...contentPack,
+          sourceAsset,
+          target: {
+            platform: "youtube",
+            output: "short",
+          },
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it("rejects a target that conflicts with the draft format", () => {
+    expect(
+      PreflightRequestSchema.safeParse({
+        contentPack: {
+          format: "short",
+          title: "Draft",
+          hook: "A useful hook for the audience",
+          angle: "A focused angle",
+          scenes: Array.from({ length: 6 }, (_, index) =>
+            scene(index + 1, 6),
+          ),
+          caption: "A concise caption",
+          cta: "Save this",
+          hashtags: [],
+          target: {
+            platform: "linkedin",
+            output: "document",
+          },
         },
       }).success,
     ).toBe(false);
